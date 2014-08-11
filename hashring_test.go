@@ -37,6 +37,39 @@ func TestNewHashRing(t *testing.T) {
 	expectNodesABC(t, hashRing)
 }
 
+func TestNewHashRingEmpty(t *testing.T) {
+	nodes := []string{}
+	weights := make(map[string]int)
+	hashRing := NewHashRing(nodes, weights)
+
+	node, ok := hashRing.GetNode("test")
+	if ok || node != "" {
+		t.Error("GetNode(test) expected (\"\", false) but got (", node, ",", ok, ")")
+	}
+}
+
+func TestNewHashRingSingle(t *testing.T) {
+	nodes := []string{"a"}
+	weights := make(map[string]int)
+	hashRing := NewHashRing(nodes, weights)
+
+	expectNode(t, hashRing, "test", "a")
+	expectNode(t, hashRing, "test", "a")
+	expectNode(t, hashRing, "test1", "a")
+	expectNode(t, hashRing, "test2", "a")
+	expectNode(t, hashRing, "test3", "a")
+
+	// This triggers the edge case where sortedKey search resulting in not found
+	expectNode(t, hashRing, "test14", "a")
+
+	expectNode(t, hashRing, "test15", "a")
+	expectNode(t, hashRing, "test16", "a")
+	expectNode(t, hashRing, "test17", "a")
+	expectNode(t, hashRing, "test18", "a")
+	expectNode(t, hashRing, "test19", "a")
+	expectNode(t, hashRing, "test20", "a")
+}
+
 func TestNewHashRingWeighted(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
 	weights := make(map[string]int)
@@ -81,6 +114,16 @@ func TestAddNode(t *testing.T) {
 }
 
 func TestAddNode2(t *testing.T) {
+	nodes := []string{"a", "c"}
+	weights := make(map[string]int)
+	hashRing := NewHashRing(nodes, weights)
+	hashRing.AddNode("b")
+	hashRing.AddNode("b")
+
+	expectNodesABC(t, hashRing)
+}
+
+func TestAddNode3(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
 	weights := make(map[string]int)
 	hashRing := NewHashRing(nodes, weights)
@@ -136,6 +179,35 @@ func TestRemoveAddNode(t *testing.T) {
 	hashRing.AddNode("b")
 
 	expectNodesABC(t, hashRing)
+}
+
+func TestRemoveAddWeightedNode(t *testing.T) {
+	nodes := []string{"a", "b", "c"}
+	weights := make(map[string]int)
+	weights["b"] = 2
+	hashRing := NewHashRing(nodes, weights)
+
+	expectNode(t, hashRing, "test", "b")
+	expectNode(t, hashRing, "test", "b")
+	expectNode(t, hashRing, "test1", "b")
+	expectNode(t, hashRing, "test2", "b")
+	expectNode(t, hashRing, "test3", "c")
+	expectNode(t, hashRing, "test4", "b")
+	expectNode(t, hashRing, "test5", "b")
+	expectNode(t, hashRing, "aaaa", "b")
+	expectNode(t, hashRing, "bbbb", "a")
+
+	hashRing.RemoveNode("c")
+
+	expectNode(t, hashRing, "test", "b")
+	expectNode(t, hashRing, "test", "b")
+	expectNode(t, hashRing, "test1", "b")
+	expectNode(t, hashRing, "test2", "b")
+	expectNode(t, hashRing, "test3", "b") // Migrated to b from c
+	expectNode(t, hashRing, "test4", "b")
+	expectNode(t, hashRing, "test5", "b")
+	expectNode(t, hashRing, "aaaa", "b")
+	expectNode(t, hashRing, "bbbb", "a")
 }
 
 func TestAddRemoveNode(t *testing.T) {

@@ -99,7 +99,8 @@ func (h *HashRing) GetNodePos(stringKey string) (pos int, ok bool) {
 	pos = sort.Search(len(nodes), func(i int) bool { return nodes[i] > key })
 
 	if pos == len(nodes) {
-		return 0, false
+		// Wrap the search, should return first node
+		return 0, true
 	} else {
 		return pos, true
 	}
