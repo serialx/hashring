@@ -17,9 +17,9 @@ import "github.com/serialx/hashring"
 ```
 
 ```go
-memcacheServers := []string{'192.168.0.246:11212',
-                            '192.168.0.247:11212',
-                            '192.168.0.249:11212'}
+memcacheServers := []string{"192.168.0.246:11212",
+                            "192.168.0.247:11212",
+                            "192.168.0.249:11212"}
 ring := hashring.HashRing(memcacheServers)
 server := ring.GetNode("my_key")
 ```
