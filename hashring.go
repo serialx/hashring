@@ -112,17 +112,7 @@ func (h *HashRing) GenKey(key string) HashKey {
 }
 
 func (h *HashRing) AddNode(node string) *HashRing {
-	for _, eNode := range h.nodes {
-		if eNode == node {
-			return h
-		}
-	}
-
-	h.ring = make(map[HashKey]string)
-	h.sortedKeys = make([]HashKey, 0)
-	h.nodes = append(h.nodes, node)
-	h.generateCircle()
-	return h
+	return h.AddWeightedNode(node, 1)
 }
 
 func (h *HashRing) AddWeightedNode(node string, weight int) *HashRing {
@@ -136,13 +126,24 @@ func (h *HashRing) AddWeightedNode(node string, weight int) *HashRing {
 		}
 	}
 
-	h.weights[node] = weight
+	nodes := make([]string, len(h.nodes), len(h.nodes)+1)
+	copy(nodes, h.nodes)
+	nodes = append(nodes, node)
 
-	h.ring = make(map[HashKey]string)
-	h.sortedKeys = make([]HashKey, 0)
-	h.nodes = append(h.nodes, node)
-	h.generateCircle()
-	return h
+	weights := make(map[string]int)
+	for eNode, eWeight := range h.weights {
+		weights[eNode] = eWeight
+	}
+	weights[node] = weight
+
+	hashRing := &HashRing{
+		ring:       make(map[HashKey]string),
+		sortedKeys: make([]HashKey, 0),
+		nodes:      nodes,
+		weights:    weights,
+	}
+	hashRing.generateCircle()
+	return hashRing
 }
 
 func (h *HashRing) RemoveNode(node string) *HashRing {
@@ -160,10 +161,12 @@ func (h *HashRing) RemoveNode(node string) *HashRing {
 		}
 	}
 
-	h.ring = make(map[HashKey]string)
-	h.sortedKeys = make([]HashKey, 0)
-	h.nodes = nodes
-	h.weights = weights
-	h.generateCircle()
-	return h
+	hashRing := &HashRing{
+		ring:       make(map[HashKey]string),
+		sortedKeys: make([]HashKey, 0),
+		nodes:      nodes,
+		weights:    weights,
+	}
+	hashRing.generateCircle()
+	return hashRing
 }

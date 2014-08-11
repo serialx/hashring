@@ -91,7 +91,7 @@ func TestRemoveNode(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
 	weights := make(map[string]int)
 	hashRing := NewHashRing(nodes, weights)
-	hashRing.RemoveNode("b")
+	hashRing = hashRing.RemoveNode("b")
 
 	expectNode(t, hashRing, "test", "a")
 	expectNode(t, hashRing, "test", "a")
@@ -108,7 +108,7 @@ func TestAddNode(t *testing.T) {
 	nodes := []string{"a", "c"}
 	weights := make(map[string]int)
 	hashRing := NewHashRing(nodes, weights)
-	hashRing.AddNode("b")
+	hashRing = hashRing.AddNode("b")
 
 	expectNodesABC(t, hashRing)
 }
@@ -117,8 +117,8 @@ func TestAddNode2(t *testing.T) {
 	nodes := []string{"a", "c"}
 	weights := make(map[string]int)
 	hashRing := NewHashRing(nodes, weights)
-	hashRing.AddNode("b")
-	hashRing.AddNode("b")
+	hashRing = hashRing.AddNode("b")
+	hashRing = hashRing.AddNode("b")
 
 	expectNodesABC(t, hashRing)
 }
@@ -127,12 +127,12 @@ func TestAddNode3(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
 	weights := make(map[string]int)
 	hashRing := NewHashRing(nodes, weights)
-	hashRing.AddNode("d")
+	hashRing = hashRing.AddNode("d")
 
 	// Somehow adding d does not load balance these keys...
 	expectNodesABCD(t, hashRing)
 
-	hashRing.AddNode("e")
+	hashRing = hashRing.AddNode("e")
 
 	expectNode(t, hashRing, "test", "a")
 	expectNode(t, hashRing, "test", "a")
@@ -144,7 +144,7 @@ func TestAddNode3(t *testing.T) {
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "e") // Migrated to e from a
 
-	hashRing.AddNode("f")
+	hashRing = hashRing.AddNode("f")
 
 	expectNode(t, hashRing, "test", "a")
 	expectNode(t, hashRing, "test", "a")
@@ -161,9 +161,9 @@ func TestAddWeightedNode(t *testing.T) {
 	nodes := []string{"a", "c"}
 	weights := make(map[string]int)
 	hashRing := NewHashRing(nodes, weights)
-	hashRing.AddWeightedNode("b", 0)
-	hashRing.AddWeightedNode("b", 2)
-	hashRing.AddWeightedNode("b", 2)
+	hashRing = hashRing.AddWeightedNode("b", 0)
+	hashRing = hashRing.AddWeightedNode("b", 2)
+	hashRing = hashRing.AddWeightedNode("b", 2)
 
 	expectNode(t, hashRing, "test", "b")
 	expectNode(t, hashRing, "test", "b")
@@ -183,7 +183,7 @@ func TestRemoveAddNode(t *testing.T) {
 
 	expectNodesABC(t, hashRing)
 
-	hashRing.RemoveNode("b")
+	hashRing = hashRing.RemoveNode("b")
 
 	expectNode(t, hashRing, "test", "a")
 	expectNode(t, hashRing, "test", "a")
@@ -195,7 +195,7 @@ func TestRemoveAddNode(t *testing.T) {
 	expectNode(t, hashRing, "aaaa", "a") // Migrated to a from b
 	expectNode(t, hashRing, "bbbb", "a")
 
-	hashRing.AddNode("b")
+	hashRing = hashRing.AddNode("b")
 
 	expectNodesABC(t, hashRing)
 }
@@ -216,7 +216,7 @@ func TestRemoveAddWeightedNode(t *testing.T) {
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "a")
 
-	hashRing.RemoveNode("c")
+	hashRing = hashRing.RemoveNode("c")
 
 	expectNode(t, hashRing, "test", "b")
 	expectNode(t, hashRing, "test", "b")
@@ -233,12 +233,12 @@ func TestAddRemoveNode(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
 	weights := make(map[string]int)
 	hashRing := NewHashRing(nodes, weights)
-	hashRing.AddNode("d")
+	hashRing = hashRing.AddNode("d")
 
 	// Somehow adding d does not load balance these keys...
 	expectNodesABCD(t, hashRing)
 
-	hashRing.AddNode("e")
+	hashRing = hashRing.AddNode("e")
 
 	expectNode(t, hashRing, "test", "a")
 	expectNode(t, hashRing, "test", "a")
@@ -250,7 +250,7 @@ func TestAddRemoveNode(t *testing.T) {
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "e") // Migrated to e from a
 
-	hashRing.AddNode("f")
+	hashRing = hashRing.AddNode("f")
 
 	expectNode(t, hashRing, "test", "a")
 	expectNode(t, hashRing, "test", "a")
@@ -262,7 +262,7 @@ func TestAddRemoveNode(t *testing.T) {
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "e")
 
-	hashRing.RemoveNode("e")
+	hashRing = hashRing.RemoveNode("e")
 
 	expectNode(t, hashRing, "test", "a")
 	expectNode(t, hashRing, "test", "a")
@@ -274,11 +274,11 @@ func TestAddRemoveNode(t *testing.T) {
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "f") // Migrated to f from e
 
-	hashRing.RemoveNode("f")
+	hashRing = hashRing.RemoveNode("f")
 
 	expectNodesABCD(t, hashRing)
 
-	hashRing.RemoveNode("d")
+	hashRing = hashRing.RemoveNode("d")
 
 	expectNodesABC(t, hashRing)
 }
