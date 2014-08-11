@@ -125,6 +125,26 @@ func (h *HashRing) AddNode(node string) *HashRing {
 	return h
 }
 
+func (h *HashRing) AddWeightedNode(node string, weight int) *HashRing {
+	if weight <= 0 {
+		return h
+	}
+
+	for _, eNode := range h.nodes {
+		if eNode == node {
+			return h
+		}
+	}
+
+	h.weights[node] = weight
+
+	h.ring = make(map[HashKey]string)
+	h.sortedKeys = make([]HashKey, 0)
+	h.nodes = append(h.nodes, node)
+	h.generateCircle()
+	return h
+}
+
 func (h *HashRing) RemoveNode(node string) *HashRing {
 	nodes := make([]string, 0)
 	for _, eNode := range h.nodes {
