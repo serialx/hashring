@@ -71,7 +71,7 @@ func (h *HashRing) generateCircle() {
 			bKey := hashDigest(nodeKey)
 
 			for i := 0; i < 3; i++ {
-				key := hashVal(bKey, func(x int) int { return x + i*4 })
+				key := hashVal(bKey[i*4 : i*4+4])
 				h.ring[key] = node
 				h.sortedKeys = append(h.sortedKeys, key)
 			}
@@ -109,7 +109,7 @@ func (h *HashRing) GetNodePos(stringKey string) (pos int, ok bool) {
 
 func (h *HashRing) GenKey(key string) HashKey {
 	bKey := hashDigest(key)
-	return hashVal(bKey, func(x int) int { return x })
+	return hashVal(bKey[0:4])
 }
 
 func (h *HashRing) AddNode(node string) *HashRing {
@@ -172,11 +172,11 @@ func (h *HashRing) RemoveNode(node string) *HashRing {
 	return hashRing
 }
 
-func hashVal(bKey []byte, entryFn func(int) int) HashKey {
-	return ((HashKey(bKey[entryFn(3)]) << 24) |
-		(HashKey(bKey[entryFn(2)]) << 16) |
-		(HashKey(bKey[entryFn(1)]) << 8) |
-		(HashKey(bKey[entryFn(0)])))
+func hashVal(bKey []byte) HashKey {
+	return ((HashKey(bKey[3]) << 24) |
+		(HashKey(bKey[2]) << 16) |
+		(HashKey(bKey[1]) << 8) |
+		(HashKey(bKey[0])))
 }
 
 func hashDigest(key string) []byte {
