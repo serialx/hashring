@@ -24,24 +24,20 @@ Basic example usage ::
 memcacheServers := []string{"192.168.0.246:11212",
                             "192.168.0.247:11212",
                             "192.168.0.249:11212"}
-weights := make(map[string]int)
 
-ring := hashring.NewHashRing(memcacheServers, weights)
+ring := hashring.New(memcacheServers)
 server := ring.GetNode("my_key")
 ```
 
 Using weights example ::
 
 ```go
-memcacheServers := []string{"192.168.0.246:11212",
-                            "192.168.0.247:11212",
-                            "192.168.0.249:11212"}
 weights := make(map[string]int)
 weights["192.168.0.246:11212"] = 1
 weights["192.168.0.247:11212"] = 2
 weights["192.168.0.249:11212"] = 1
 
-ring := hashring.NewHashRing(memcacheServers, weights)
+ring := hashring.NewWithWeights(weights)
 server := ring.GetNode("my_key")
 ```
 
@@ -51,9 +47,8 @@ Adding and removing nodes example ::
 memcacheServers := []string{"192.168.0.246:11212",
                             "192.168.0.247:11212",
                             "192.168.0.249:11212"}
-weights := make(map[string]int)
 
-ring := hashring.NewHashRing(memcacheServers, weights)
+ring := hashring.New(memcacheServers)
 ring = ring.RemoveNode("192.168.0.246:11212")
 ring = ring.AddNode("192.168.0.250:11212")
 server := ring.GetNode("my_key")

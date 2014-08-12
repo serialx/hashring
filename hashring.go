@@ -22,7 +22,22 @@ type HashRing struct {
 	weights    map[string]int
 }
 
-func NewHashRing(nodes []string, weights map[string]int) *HashRing {
+func New(nodes []string) *HashRing {
+	hashRing := &HashRing{
+		ring:       make(map[HashKey]string),
+		sortedKeys: make([]HashKey, 0),
+		nodes:      nodes,
+		weights:    make(map[string]int),
+	}
+	hashRing.generateCircle()
+	return hashRing
+}
+
+func NewWithWeights(weights map[string]int) *HashRing {
+	nodes := make([]string, 0, len(weights))
+	for node, _ := range weights {
+		nodes = append(nodes, node)
+	}
 	hashRing := &HashRing{
 		ring:       make(map[HashKey]string),
 		sortedKeys: make([]HashKey, 0),

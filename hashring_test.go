@@ -29,18 +29,16 @@ func expectNodesABCD(t *testing.T, hashRing *HashRing) {
 	expectNodesABC(t, hashRing)
 }
 
-func TestNewHashRing(t *testing.T) {
+func TestNew(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
-	weights := make(map[string]int)
-	hashRing := NewHashRing(nodes, weights)
+	hashRing := New(nodes)
 
 	expectNodesABC(t, hashRing)
 }
 
-func TestNewHashRingEmpty(t *testing.T) {
+func TestNewEmpty(t *testing.T) {
 	nodes := []string{}
-	weights := make(map[string]int)
-	hashRing := NewHashRing(nodes, weights)
+	hashRing := New(nodes)
 
 	node, ok := hashRing.GetNode("test")
 	if ok || node != "" {
@@ -48,10 +46,9 @@ func TestNewHashRingEmpty(t *testing.T) {
 	}
 }
 
-func TestNewHashRingSingle(t *testing.T) {
+func TestNewSingle(t *testing.T) {
 	nodes := []string{"a"}
-	weights := make(map[string]int)
-	hashRing := NewHashRing(nodes, weights)
+	hashRing := New(nodes)
 
 	expectNode(t, hashRing, "test", "a")
 	expectNode(t, hashRing, "test", "a")
@@ -70,11 +67,12 @@ func TestNewHashRingSingle(t *testing.T) {
 	expectNode(t, hashRing, "test20", "a")
 }
 
-func TestNewHashRingWeighted(t *testing.T) {
-	nodes := []string{"a", "b", "c"}
+func TestNewWeighted(t *testing.T) {
 	weights := make(map[string]int)
+	weights["a"] = 1
 	weights["b"] = 2
-	hashRing := NewHashRing(nodes, weights)
+	weights["c"] = 1
+	hashRing := NewWithWeights(weights)
 
 	expectNode(t, hashRing, "test", "b")
 	expectNode(t, hashRing, "test", "b")
@@ -89,8 +87,7 @@ func TestNewHashRingWeighted(t *testing.T) {
 
 func TestRemoveNode(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
-	weights := make(map[string]int)
-	hashRing := NewHashRing(nodes, weights)
+	hashRing := New(nodes)
 	hashRing = hashRing.RemoveNode("b")
 
 	expectNode(t, hashRing, "test", "a")
@@ -106,8 +103,7 @@ func TestRemoveNode(t *testing.T) {
 
 func TestAddNode(t *testing.T) {
 	nodes := []string{"a", "c"}
-	weights := make(map[string]int)
-	hashRing := NewHashRing(nodes, weights)
+	hashRing := New(nodes)
 	hashRing = hashRing.AddNode("b")
 
 	expectNodesABC(t, hashRing)
@@ -115,8 +111,7 @@ func TestAddNode(t *testing.T) {
 
 func TestAddNode2(t *testing.T) {
 	nodes := []string{"a", "c"}
-	weights := make(map[string]int)
-	hashRing := NewHashRing(nodes, weights)
+	hashRing := New(nodes)
 	hashRing = hashRing.AddNode("b")
 	hashRing = hashRing.AddNode("b")
 
@@ -125,8 +120,7 @@ func TestAddNode2(t *testing.T) {
 
 func TestAddNode3(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
-	weights := make(map[string]int)
-	hashRing := NewHashRing(nodes, weights)
+	hashRing := New(nodes)
 	hashRing = hashRing.AddNode("d")
 
 	// Somehow adding d does not load balance these keys...
@@ -159,8 +153,7 @@ func TestAddNode3(t *testing.T) {
 
 func TestAddWeightedNode(t *testing.T) {
 	nodes := []string{"a", "c"}
-	weights := make(map[string]int)
-	hashRing := NewHashRing(nodes, weights)
+	hashRing := New(nodes)
 	hashRing = hashRing.AddWeightedNode("b", 0)
 	hashRing = hashRing.AddWeightedNode("b", 2)
 	hashRing = hashRing.AddWeightedNode("b", 2)
@@ -178,8 +171,7 @@ func TestAddWeightedNode(t *testing.T) {
 
 func TestRemoveAddNode(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
-	weights := make(map[string]int)
-	hashRing := NewHashRing(nodes, weights)
+	hashRing := New(nodes)
 
 	expectNodesABC(t, hashRing)
 
@@ -201,10 +193,11 @@ func TestRemoveAddNode(t *testing.T) {
 }
 
 func TestRemoveAddWeightedNode(t *testing.T) {
-	nodes := []string{"a", "b", "c"}
 	weights := make(map[string]int)
+	weights["a"] = 1
 	weights["b"] = 2
-	hashRing := NewHashRing(nodes, weights)
+	weights["c"] = 1
+	hashRing := NewWithWeights(weights)
 
 	expectNode(t, hashRing, "test", "b")
 	expectNode(t, hashRing, "test", "b")
@@ -231,8 +224,7 @@ func TestRemoveAddWeightedNode(t *testing.T) {
 
 func TestAddRemoveNode(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
-	weights := make(map[string]int)
-	hashRing := NewHashRing(nodes, weights)
+	hashRing := New(nodes)
 	hashRing = hashRing.AddNode("d")
 
 	// Somehow adding d does not load balance these keys...
