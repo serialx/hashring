@@ -8,7 +8,6 @@ import (
 )
 
 type HashKey uint32
-
 type HashKeyOrder []HashKey
 
 func (h HashKeyOrder) Len() int           { return len(h) }
@@ -46,19 +45,6 @@ func NewWithWeights(weights map[string]int) *HashRing {
 	}
 	hashRing.generateCircle()
 	return hashRing
-}
-
-func hashVal(bKey []byte, entryFn func(int) int) HashKey {
-	return ((HashKey(bKey[entryFn(3)]) << 24) |
-		(HashKey(bKey[entryFn(2)]) << 16) |
-		(HashKey(bKey[entryFn(1)]) << 8) |
-		(HashKey(bKey[entryFn(0)])))
-}
-
-func hashDigest(key string) []byte {
-	m := md5.New()
-	m.Write([]byte(key))
-	return m.Sum(nil)
 }
 
 func (h *HashRing) generateCircle() {
@@ -184,4 +170,17 @@ func (h *HashRing) RemoveNode(node string) *HashRing {
 	}
 	hashRing.generateCircle()
 	return hashRing
+}
+
+func hashVal(bKey []byte, entryFn func(int) int) HashKey {
+	return ((HashKey(bKey[entryFn(3)]) << 24) |
+		(HashKey(bKey[entryFn(2)]) << 16) |
+		(HashKey(bKey[entryFn(1)]) << 8) |
+		(HashKey(bKey[entryFn(0)])))
+}
+
+func hashDigest(key string) []byte {
+	m := md5.New()
+	m.Write([]byte(key))
+	return m.Sum(nil)
 }
