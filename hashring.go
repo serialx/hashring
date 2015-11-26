@@ -112,6 +112,34 @@ func (h *HashRing) GenKey(key string) HashKey {
 	return hashVal(bKey[0:4])
 }
 
+func (h *HashRing) GetNodes(stringKey string, size int) (nodes []string, ok bool) {
+	pos, ok := h.GetNodePos(stringKey)
+	if !ok {
+		return []string{}, false
+	}
+
+	if size > len(h.nodes) {
+		return []string{}, false
+	}
+
+	returnedValues := make(map[string]bool, size)
+	mergedSortedKeys := append(h.sortedKeys[pos:], h.sortedKeys[:pos]...)
+	resultSlice := []string{}
+
+	for _, key := range mergedSortedKeys {
+		val := h.ring[key]
+		if !returnedValues[val] {
+			returnedValues[val] = true
+			resultSlice = append(resultSlice, val)
+		}
+		if len(returnedValues) == size {
+			break
+		}
+	}
+
+	return resultSlice, len(resultSlice) == size
+}
+
 func (h *HashRing) AddNode(node string) *HashRing {
 	return h.AddWeightedNode(node, 1)
 }

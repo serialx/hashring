@@ -1,6 +1,7 @@
 package hashring
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -8,6 +9,14 @@ func expectNode(t *testing.T, hashRing *HashRing, key string, expectedNode strin
 	node, ok := hashRing.GetNode(key)
 	if !ok || node != expectedNode {
 		t.Error("GetNode(", key, ") expected", expectedNode, "but got", node)
+	}
+}
+
+func expectNodes(t *testing.T, hashRing *HashRing, key string, expectedNodes []string) {
+	nodes, ok := hashRing.GetNodes(key, 2)
+	sliceEquality := reflect.DeepEqual(nodes, expectedNodes)
+	if !ok || !sliceEquality {
+		t.Error("GetNodes(", key, ") expected", expectedNodes, "but got", nodes)
 	}
 }
 
@@ -24,6 +33,18 @@ func expectNodesABC(t *testing.T, hashRing *HashRing) {
 	expectNode(t, hashRing, "bbbb", "a")
 }
 
+func expectNodeRangesABC(t *testing.T, hashRing *HashRing) {
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+	expectNodes(t, hashRing, "test1", []string{"b", "c"})
+	expectNodes(t, hashRing, "test2", []string{"b", "a"})
+	expectNodes(t, hashRing, "test3", []string{"c", "a"})
+	expectNodes(t, hashRing, "test4", []string{"c", "b"})
+	expectNodes(t, hashRing, "test5", []string{"a", "c"})
+	expectNodes(t, hashRing, "aaaa", []string{"b", "a"})
+	expectNodes(t, hashRing, "bbbb", []string{"a", "b"})
+}
+
 func expectNodesABCD(t *testing.T, hashRing *HashRing) {
 	// Somehow adding d does not load balance these keys...
 	expectNodesABC(t, hashRing)
@@ -34,6 +55,7 @@ func TestNew(t *testing.T) {
 	hashRing := New(nodes)
 
 	expectNodesABC(t, hashRing)
+	expectNodeRangesABC(t, hashRing)
 }
 
 func TestNewEmpty(t *testing.T) {
@@ -43,6 +65,31 @@ func TestNewEmpty(t *testing.T) {
 	node, ok := hashRing.GetNode("test")
 	if ok || node != "" {
 		t.Error("GetNode(test) expected (\"\", false) but got (", node, ",", ok, ")")
+	}
+
+	nodes, rok := hashRing.GetNodes("test", 2)
+	if rok || !(len(nodes) == 0) {
+		t.Error("GetNode(test) expected ( [], false ) but got (", nodes, ",", rok, ")")
+	}
+}
+
+func TestForMoreNodes(t *testing.T) {
+	nodes := []string{"a", "b", "c"}
+	hashRing := New(nodes)
+
+	nodes, ok := hashRing.GetNodes("test", 5)
+	if ok || !(len(nodes) == 0) {
+		t.Error("GetNode(test) expected ( [], false ) but got (", nodes, ",", ok, ")")
+	}
+}
+
+func TestForEqualNodes(t *testing.T) {
+	nodes := []string{"a", "b", "c"}
+	hashRing := New(nodes)
+
+	nodes, ok := hashRing.GetNodes("test", 3)
+	if !ok && (len(nodes) == 3) {
+		t.Error("GetNode(test) expected ( [a b c], true ) but got (", nodes, ",", ok, ")")
 	}
 }
 
@@ -83,6 +130,8 @@ func TestNewWeighted(t *testing.T) {
 	expectNode(t, hashRing, "test5", "b")
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "a")
+
+	expectNodes(t, hashRing, "test", []string{"b", "a"})
 }
 
 func TestRemoveNode(t *testing.T) {
@@ -99,6 +148,8 @@ func TestRemoveNode(t *testing.T) {
 	expectNode(t, hashRing, "test5", "a")
 	expectNode(t, hashRing, "aaaa", "a") // Migrated to a from b
 	expectNode(t, hashRing, "bbbb", "a")
+
+	expectNodes(t, hashRing, "test", []string{"a", "c"})
 }
 
 func TestAddNode(t *testing.T) {
@@ -116,6 +167,7 @@ func TestAddNode2(t *testing.T) {
 	hashRing = hashRing.AddNode("b")
 
 	expectNodesABC(t, hashRing)
+	expectNodeRangesABC(t, hashRing)
 }
 
 func TestAddNode3(t *testing.T) {
@@ -138,6 +190,8 @@ func TestAddNode3(t *testing.T) {
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "e") // Migrated to e from a
 
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+
 	hashRing = hashRing.AddNode("f")
 
 	expectNode(t, hashRing, "test", "a")
@@ -149,6 +203,23 @@ func TestAddNode3(t *testing.T) {
 	expectNode(t, hashRing, "test5", "f") // Migrated to f from a
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "e")
+
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+}
+
+func TestDuplicateNodes(t *testing.T) {
+	nodes := []string{"a", "a", "a", "a", "b"}
+	hashRing := New(nodes)
+
+	expectNode(t, hashRing, "test", "a")
+	expectNode(t, hashRing, "test", "a")
+	expectNode(t, hashRing, "test1", "b")
+	expectNode(t, hashRing, "test2", "b")
+	expectNode(t, hashRing, "test3", "a")
+	expectNode(t, hashRing, "test4", "b")
+	expectNode(t, hashRing, "test5", "a")
+	expectNode(t, hashRing, "aaaa", "b")
+	expectNode(t, hashRing, "bbbb", "a")
 }
 
 func TestAddWeightedNode(t *testing.T) {
@@ -167,6 +238,8 @@ func TestAddWeightedNode(t *testing.T) {
 	expectNode(t, hashRing, "test5", "b")
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "a")
+
+	expectNodes(t, hashRing, "test", []string{"b", "a"})
 }
 
 func TestRemoveAddNode(t *testing.T) {
@@ -174,6 +247,7 @@ func TestRemoveAddNode(t *testing.T) {
 	hashRing := New(nodes)
 
 	expectNodesABC(t, hashRing)
+	expectNodeRangesABC(t, hashRing)
 
 	hashRing = hashRing.RemoveNode("b")
 
@@ -187,9 +261,20 @@ func TestRemoveAddNode(t *testing.T) {
 	expectNode(t, hashRing, "aaaa", "a") // Migrated to a from b
 	expectNode(t, hashRing, "bbbb", "a")
 
+	expectNodes(t, hashRing, "test", []string{"a", "c"})
+	expectNodes(t, hashRing, "test", []string{"a", "c"})
+	expectNodes(t, hashRing, "test1", []string{"c", "a"})
+	expectNodes(t, hashRing, "test2", []string{"a", "c"})
+	expectNodes(t, hashRing, "test3", []string{"c", "a"})
+	expectNodes(t, hashRing, "test4", []string{"c", "a"})
+	expectNodes(t, hashRing, "test5", []string{"a", "c"})
+	expectNodes(t, hashRing, "aaaa", []string{"a", "c"})
+	expectNodes(t, hashRing, "bbbb", []string{"a", "c"})
+
 	hashRing = hashRing.AddNode("b")
 
 	expectNodesABC(t, hashRing)
+	expectNodeRangesABC(t, hashRing)
 }
 
 func TestRemoveAddWeightedNode(t *testing.T) {
@@ -209,6 +294,16 @@ func TestRemoveAddWeightedNode(t *testing.T) {
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "a")
 
+	expectNodes(t, hashRing, "test", []string{"b", "a"})
+	expectNodes(t, hashRing, "test", []string{"b", "a"})
+	expectNodes(t, hashRing, "test1", []string{"b", "c"})
+	expectNodes(t, hashRing, "test2", []string{"b", "a"})
+	expectNodes(t, hashRing, "test3", []string{"c", "b"})
+	expectNodes(t, hashRing, "test4", []string{"b", "a"})
+	expectNodes(t, hashRing, "test5", []string{"b", "a"})
+	expectNodes(t, hashRing, "aaaa", []string{"b", "a"})
+	expectNodes(t, hashRing, "bbbb", []string{"a", "b"})
+
 	hashRing = hashRing.RemoveNode("c")
 
 	expectNode(t, hashRing, "test", "b")
@@ -220,6 +315,16 @@ func TestRemoveAddWeightedNode(t *testing.T) {
 	expectNode(t, hashRing, "test5", "b")
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "a")
+
+	expectNodes(t, hashRing, "test", []string{"b", "a"})
+	expectNodes(t, hashRing, "test", []string{"b", "a"})
+	expectNodes(t, hashRing, "test1", []string{"b", "a"})
+	expectNodes(t, hashRing, "test2", []string{"b", "a"})
+	expectNodes(t, hashRing, "test3", []string{"b", "a"})
+	expectNodes(t, hashRing, "test4", []string{"b", "a"})
+	expectNodes(t, hashRing, "test5", []string{"b", "a"})
+	expectNodes(t, hashRing, "aaaa", []string{"b", "a"})
+	expectNodes(t, hashRing, "bbbb", []string{"a", "b"})
 }
 
 func TestAddRemoveNode(t *testing.T) {
@@ -229,6 +334,16 @@ func TestAddRemoveNode(t *testing.T) {
 
 	// Somehow adding d does not load balance these keys...
 	expectNodesABCD(t, hashRing)
+
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+	expectNodes(t, hashRing, "test1", []string{"b", "d"})
+	expectNodes(t, hashRing, "test2", []string{"b", "d"})
+	expectNodes(t, hashRing, "test3", []string{"c", "d"})
+	expectNodes(t, hashRing, "test4", []string{"c", "b"})
+	expectNodes(t, hashRing, "test5", []string{"a", "d"})
+	expectNodes(t, hashRing, "aaaa", []string{"b", "a"})
+	expectNodes(t, hashRing, "bbbb", []string{"a", "b"})
 
 	hashRing = hashRing.AddNode("e")
 
@@ -242,6 +357,16 @@ func TestAddRemoveNode(t *testing.T) {
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "e") // Migrated to e from a
 
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+	expectNodes(t, hashRing, "test1", []string{"b", "d"})
+	expectNodes(t, hashRing, "test2", []string{"b", "d"})
+	expectNodes(t, hashRing, "test3", []string{"c", "e"})
+	expectNodes(t, hashRing, "test4", []string{"c", "b"})
+	expectNodes(t, hashRing, "test5", []string{"a", "e"})
+	expectNodes(t, hashRing, "aaaa", []string{"b", "e"})
+	expectNodes(t, hashRing, "bbbb", []string{"e", "a"})
+
 	hashRing = hashRing.AddNode("f")
 
 	expectNode(t, hashRing, "test", "a")
@@ -253,6 +378,16 @@ func TestAddRemoveNode(t *testing.T) {
 	expectNode(t, hashRing, "test5", "f") // Migrated to f from a
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "e")
+
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+	expectNodes(t, hashRing, "test1", []string{"b", "d"})
+	expectNodes(t, hashRing, "test2", []string{"f", "b"})
+	expectNodes(t, hashRing, "test3", []string{"f", "c"})
+	expectNodes(t, hashRing, "test4", []string{"c", "b"})
+	expectNodes(t, hashRing, "test5", []string{"f", "a"})
+	expectNodes(t, hashRing, "aaaa", []string{"b", "e"})
+	expectNodes(t, hashRing, "bbbb", []string{"e", "f"})
 
 	hashRing = hashRing.RemoveNode("e")
 
@@ -266,11 +401,32 @@ func TestAddRemoveNode(t *testing.T) {
 	expectNode(t, hashRing, "aaaa", "b")
 	expectNode(t, hashRing, "bbbb", "f") // Migrated to f from e
 
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+	expectNodes(t, hashRing, "test1", []string{"b", "d"})
+	expectNodes(t, hashRing, "test2", []string{"f", "b"})
+	expectNodes(t, hashRing, "test3", []string{"f", "c"})
+	expectNodes(t, hashRing, "test4", []string{"c", "b"})
+	expectNodes(t, hashRing, "test5", []string{"f", "a"})
+	expectNodes(t, hashRing, "aaaa", []string{"b", "a"})
+	expectNodes(t, hashRing, "bbbb", []string{"f", "a"})
+
 	hashRing = hashRing.RemoveNode("f")
 
 	expectNodesABCD(t, hashRing)
 
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+	expectNodes(t, hashRing, "test", []string{"a", "b"})
+	expectNodes(t, hashRing, "test1", []string{"b", "d"})
+	expectNodes(t, hashRing, "test2", []string{"b", "d"})
+	expectNodes(t, hashRing, "test3", []string{"c", "d"})
+	expectNodes(t, hashRing, "test4", []string{"c", "b"})
+	expectNodes(t, hashRing, "test5", []string{"a", "d"})
+	expectNodes(t, hashRing, "aaaa", []string{"b", "a"})
+	expectNodes(t, hashRing, "bbbb", []string{"a", "b"})
+
 	hashRing = hashRing.RemoveNode("d")
 
 	expectNodesABC(t, hashRing)
+	expectNodeRangesABC(t, hashRing)
 }
