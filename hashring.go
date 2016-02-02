@@ -123,10 +123,11 @@ func (h *HashRing) GetNodes(stringKey string, size int) (nodes []string, ok bool
 	}
 
 	returnedValues := make(map[string]bool, size)
-	mergedSortedKeys := append(h.sortedKeys[pos:], h.sortedKeys[:pos]...)
-	resultSlice := []string{}
+	//mergedSortedKeys := append(h.sortedKeys[pos:], h.sortedKeys[:pos]...)
+	resultSlice := make([]string, 0, size)
 
-	for _, key := range mergedSortedKeys {
+	for i := pos; i < pos+len(h.sortedKeys); i++ {
+		key := h.sortedKeys[i%len(h.sortedKeys)]
 		val := h.ring[key]
 		if !returnedValues[val] {
 			returnedValues[val] = true
