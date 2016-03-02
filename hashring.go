@@ -184,6 +184,11 @@ func (h *HashRing) RemoveNode(node string) *HashRing {
 		}
 	}
 
+	/* if node isn't exist in hashring, don't refresh hashring */
+	if len(nodes) == len(h.nodes) {
+		return h
+	}
+
 	weights := make(map[string]int)
 	for eNode, eWeight := range h.weights {
 		if eNode != node {
