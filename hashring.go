@@ -176,6 +176,34 @@ func (h *HashRing) AddWeightedNode(node string, weight int) *HashRing {
 	return hashRing
 }
 
+func (h *HashRing) UpdateWeightedNode(node string, weight int) *HashRing {
+	if weight <= 0 {
+		return h
+	}
+
+	/* node is not need to update for node is not existed or weight is not changed */
+	if oldWeight, ok := h.weights[node]; (!ok) || (ok && oldWeight == weight) {
+		return h
+	}
+
+	nodes := make([]string, len(h.nodes), len(h.nodes))
+	copy(nodes, h.nodes)
+
+	weights := make(map[string]int)
+	for eNode, eWeight := range h.weights {
+		weights[eNode] = eWeight
+	}
+	weights[node] = weight
+
+	hashRing := &HashRing{
+		ring:       make(map[HashKey]string),
+		sortedKeys: make([]HashKey, 0),
+		nodes:      nodes,
+		weights:    weights,
+	}
+	hashRing.generateCircle()
+	return hashRing
+}
 func (h *HashRing) RemoveNode(node string) *HashRing {
 	nodes := make([]string, 0)
 	for _, eNode := range h.nodes {
