@@ -47,6 +47,29 @@ func NewWithWeights(weights map[string]int) *HashRing {
 	return hashRing
 }
 
+func (h *HashRing) UpdateWithWeights(weights map[string]int) {
+	nodesChgFlg := false
+	if len(weights) != len(h.weights) {
+		nodesChgFlg = true
+	} else {
+		for node, newWeight := range weights {
+			oldWeight, ok := h.weights[node]
+			if !ok || oldWeight != newWeight {
+				nodesChgFlg = true
+				break
+			}
+		}
+	}
+
+	if nodesChgFlg {
+		newhring := NewWithWeights(weights)
+		h.weights = newhring.weights
+		h.nodes = newhring.nodes
+		h.ring = newhring.ring
+		h.sortedKeys = newhring.sortedKeys
+	}
+}
+
 func (h *HashRing) generateCircle() {
 	totalWeight := 0
 	for _, node := range h.nodes {
