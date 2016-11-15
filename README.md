@@ -26,7 +26,7 @@ memcacheServers := []string{"192.168.0.246:11212",
                             "192.168.0.249:11212"}
 
 ring := hashring.New(memcacheServers)
-server := ring.GetNode("my_key")
+server, _ := ring.GetNode("my_key")
 ```
 
 Using weights example ::
@@ -38,7 +38,7 @@ weights["192.168.0.247:11212"] = 2
 weights["192.168.0.249:11212"] = 1
 
 ring := hashring.NewWithWeights(weights)
-server := ring.GetNode("my_key")
+server, _ := ring.GetNode("my_key")
 ```
 
 Adding and removing nodes example ::
