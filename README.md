@@ -66,5 +66,5 @@ memcacheServers := []string{"192.168.0.246:11212",
 ring := hashring.New(memcacheServers)
 ring = ring.RemoveNode("192.168.0.246:11212")
 ring = ring.AddNode("192.168.0.250:11212")
-server := ring.GetNode("my_key")
+server, _ := ring.GetNode("my_key")
 ```
