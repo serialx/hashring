@@ -142,11 +142,11 @@ func (h *HashRing) GenKey(key string) HashKey {
 func (h *HashRing) GetNodes(stringKey string, size int) (nodes []string, ok bool) {
 	pos, ok := h.GetNodePos(stringKey)
 	if !ok {
-		return []string{}, false
+		return nil, false
 	}
 
 	if size > len(h.nodes) {
-		return []string{}, false
+		return nil, false
 	}
 
 	returnedValues := make(map[string]bool, size)
@@ -268,8 +268,6 @@ func hashVal(bKey []byte) HashKey {
 		(HashKey(bKey[0])))
 }
 
-func hashDigest(key string) []byte {
-	m := md5.New()
-	m.Write([]byte(key))
-	return m.Sum(nil)
+func hashDigest(key string) [md5.Size]byte {
+	return md5.Sum([]byte(key))
 }
