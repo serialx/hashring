@@ -1,0 +1,12 @@
+language: go 
+
+go: 
+    - 1.7
+	- 1.8
+	- 1.9.x
+  
+install:
+    - go get -v -u github.com/1046102779/slicelement
+
+script:
+  - go test  -v ./..
