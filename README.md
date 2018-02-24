@@ -56,6 +56,15 @@ ring := hashring.NewWithWeights(weights)
 server, _ := ring.GetNode("my_key")
 ```
 
+Using update with weights example ::
+
+```go
+ring := New(serversInRing)
+ring = ring.UpdateWithWeights(weights)
+server, _ := ring.GetNode("my_key")
+
+```
+
 Adding and removing nodes example ::
 
 ```go
