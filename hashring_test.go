@@ -20,6 +20,13 @@ func expectNodes(t *testing.T, hashRing *HashRing, key string, expectedNodes []s
 	}
 }
 
+func expectWeights(t *testing.T, hashRing *HashRing, expectedWeights map[string]int) {
+	weightsEquality := reflect.DeepEqual(hashRing.weights, expectedWeights)
+	if !weightsEquality {
+		t.Error("Weights expected", expectedWeights, "but got", hashRing.weights)
+	}
+}
+
 func expectNodesABC(t *testing.T, hashRing *HashRing) {
 	// Python hash_ring module test case
 	expectNode(t, hashRing, "test", "a")
@@ -158,6 +165,13 @@ func TestAddNode(t *testing.T) {
 	hashRing = hashRing.AddNode("b")
 
 	expectNodesABC(t, hashRing)
+
+	defaultWeights := map[string]int{
+		"a": 1,
+		"b": 1,
+		"c": 1,
+	}
+	expectWeights(t, hashRing, defaultWeights)
 }
 
 func TestAddNode2(t *testing.T) {
@@ -306,6 +320,8 @@ func TestRemoveAddWeightedNode(t *testing.T) {
 	weights["c"] = 1
 	hashRing := NewWithWeights(weights)
 
+	expectWeights(t, hashRing, weights)
+
 	expectNode(t, hashRing, "test", "b")
 	expectNode(t, hashRing, "test", "b")
 	expectNode(t, hashRing, "test1", "b")
@@ -327,6 +343,9 @@ func TestRemoveAddWeightedNode(t *testing.T) {
 	expectNodes(t, hashRing, "bbbb", []string{"a", "b"})
 
 	hashRing = hashRing.RemoveNode("c")
+
+	delete(weights, "c")
+	expectWeights(t, hashRing, weights)
 
 	expectNode(t, hashRing, "test", "b")
 	expectNode(t, hashRing, "test", "b")
