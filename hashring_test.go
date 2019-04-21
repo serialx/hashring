@@ -519,3 +519,11 @@ func BenchmarkHashesSingle(b *testing.B) {
 		hashRing.GetNode(o.key)
 	}
 }
+
+func BenchmarkNew(b *testing.B) {
+	nodes := []string{"a", "b", "c", "d", "e", "f", "g"}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = New(nodes)
+	}
+}
