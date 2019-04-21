@@ -2,9 +2,9 @@ package hashring
 
 import (
 	"crypto/md5"
-	"fmt"
 	"math"
 	"sort"
+	"strconv"
 )
 
 type HashKey uint32
@@ -91,7 +91,7 @@ func (h *HashRing) generateCircle() {
 		factor := math.Floor(float64(40*len(h.nodes)*weight) / float64(totalWeight))
 
 		for j := 0; j < int(factor); j++ {
-			nodeKey := fmt.Sprintf("%s-%d", node, j)
+			nodeKey := node + "-" + strconv.FormatInt(int64(j), 10)
 			bKey := hashDigest(nodeKey)
 
 			for i := 0; i < 3; i++ {
