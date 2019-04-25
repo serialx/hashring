@@ -1,8 +1,16 @@
 package hashring
 
 import (
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
+	"fmt"
+	"hash"
+	"hash/fnv"
 	"reflect"
 	"testing"
+
+	"github.com/minio/highwayhash"
 )
 
 func expectNode(t *testing.T, hashRing *HashRing, key string, expectedNode string) {
@@ -472,51 +480,90 @@ func TestAddRemoveNode(t *testing.T) {
 	expectNodeRangesABC(t, hashRing)
 }
 
-func BenchmarkHashes(b *testing.B) {
-	nodes := []string{"a", "b", "c", "d", "e", "f", "g"}
-	hashRing := New(nodes)
-	tt := []struct {
-		key   string
-		nodes []string
-	}{
-		{"test", []string{"a", "b"}},
-		{"test", []string{"a", "b"}},
-		{"test1", []string{"b", "d"}},
-		{"test2", []string{"f", "b"}},
-		{"test3", []string{"f", "c"}},
-		{"test4", []string{"c", "b"}},
-		{"test5", []string{"f", "a"}},
-		{"aaaa", []string{"b", "a"}},
-		{"bbbb", []string{"f", "a"}},
+func TestCustomHashFailWithNil(t *testing.T) {
+	_, err := NewWithHash([]string{}, nil)
+	if err == nil {
+		t.Fatalf("NewWithHash should return an error if called with nil Hash")
 	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		o := tt[i%len(tt)]
-		hashRing.GetNodes(o.key, 2)
+	_, err = NewWithHashAndWeights(map[string]int{}, nil)
+	if err == nil {
+		t.Fatalf("NewWithHash should return an error if called with nil Hash")
 	}
 }
 
-func BenchmarkHashesSingle(b *testing.B) {
-	nodes := []string{"a", "b", "c", "d", "e", "f", "g"}
-	hashRing := New(nodes)
-	tt := []struct {
-		key   string
-		nodes []string
-	}{
-		{"test", []string{"a", "b"}},
-		{"test", []string{"a", "b"}},
-		{"test1", []string{"b", "d"}},
-		{"test2", []string{"f", "b"}},
-		{"test3", []string{"f", "c"}},
-		{"test4", []string{"c", "b"}},
-		{"test5", []string{"f", "a"}},
-		{"aaaa", []string{"b", "a"}},
-		{"bbbb", []string{"f", "a"}},
+func TestCustomHash(t *testing.T) {
+	hasher := sha512.New()
+	nodes := []string{"a", "c"}
+	hashRing, _ := NewWithHash(nodes, hasher)
+
+	hashRing = hashRing.AddNode("b")
+	_, ok := hashRing.GetNode("omelette-du-fromage")
+	if !ok {
+		t.Fatalf("can't properly find a node")
 	}
+}
+
+func benchmarkHash(b *testing.B, size int, keyLen int, hash hash.Hash) {
+	nodes := []string{"a", "b", "c", "d", "e", "f", "g"}
+	hashRing, _ := NewWithHash(nodes, hash)
+	key := make([]byte, keyLen)
+	for i := range key {
+		key[i] = '0'
+	}
+
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		o := tt[i%len(tt)]
-		hashRing.GetNode(o.key)
+	if size > 1 {
+		for i := 0; i < b.N; i++ {
+			// generate a printable ascii char (easier to display in debuggers)
+			key[i%len(key)] = byte(32 + i%(94))
+			hashRing.GetNodes(string(key), size)
+		}
+	} else {
+		for i := 0; i < b.N; i++ {
+			key[i%len(key)] = byte(32 + i%(94))
+			hashRing.GetNodes(string(key), size)
+		}
+	}
+}
+
+func BenchmarkHashes(b *testing.B) {
+	type Case struct {
+		name string
+		hash.Hash
+	}
+	nodeSearched := []int{1, 2, 5}
+	keyLens := []int{10, 50, 100, 500, 1024}
+	cases := []Case{
+		{
+			"sha256", sha256.New(),
+		},
+		{
+			"sha1", sha1.New(),
+		},
+		{
+			"sha512", sha512.New(),
+		},
+		{
+			"FNV1", fnv.New128(),
+		},
+	}
+
+	hw, _ := highwayhash.New([]byte("01234567890123456789012345678901"))
+	cases = append(cases, Case{"HighwayHash", hw})
+
+	for _, l := range keyLens {
+		b.Run(fmt.Sprintf("KeyLen%dB", l), func(b *testing.B) {
+
+			for _, n := range nodeSearched {
+				b.Run(fmt.Sprintf("N%d", n), func(b *testing.B) {
+					for _, test := range cases {
+						b.Run(test.name, func(b *testing.B) {
+							benchmarkHash(b, n, l, test.Hash)
+						})
+					}
+				})
+			}
+		})
 	}
 }
 
