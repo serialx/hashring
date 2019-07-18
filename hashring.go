@@ -280,5 +280,7 @@ func hashVal(bKey []byte) HashKey {
 }
 
 func (h *HashRing) hashDigest(key string) []byte {
-	return h.hasher.Sum([]byte(key))
+	h.hasher.Reset()
+	h.hasher.Write([]byte(key))
+	return h.hasher.Sum(nil)
 }
