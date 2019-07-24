@@ -88,7 +88,7 @@ func (h *HashRing) generateCircle() {
 	for _, node := range h.nodes {
 		weight := h.weights[node]
 
-		factor := math.Floor(float64(40*len(h.nodes)*weight) / float64(totalWeight))
+		factor := math.Floor(float64(40*len(h.nodes)*weight)/float64(totalWeight)) + 1
 
 		for j := 0; j < int(factor); j++ {
 			nodeKey := node + "-" + strconv.FormatInt(int64(j), 10)
