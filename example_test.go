@@ -5,7 +5,6 @@ import (
 	"fmt"
 )
 
-
 func ExampleGetAllNodes() {
 	hashRing := New([]string{"node1", "node2", "node3"})
 	nodes, _ := hashRing.GetNodes("key", hashRing.Size())
