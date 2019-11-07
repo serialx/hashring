@@ -9,25 +9,46 @@ import (
 // See examples for details.
 type HashSum func([]byte) []byte
 
-func (r HashSum) Int64PairHash() (HashFunc, error) {
+func (r HashSum) Use(
+	hashKeyFunc func(bytes []byte) (HashKey, error),
+) (HashFunc, error) {
 	// check HashSum for errors
 	testResult := r([]byte("test"))
-	_, err := NewInt64PairHashKey(testResult)
+	_, err := hashKeyFunc(testResult)
 	if err != nil {
-		return nil, fmt.Errorf("can't use given hash.Hash with Int64PairHash: %w", err)
+		const msg = "can't use given hash.Hash with given hashKeyFunc"
+		return nil, fmt.Errorf("%s: %w", msg, err)
 	}
 
 	// build HashFunc
 	return func(key []byte) HashKey {
 		bytes := r(key)
 		// ignore error because we already checked HashSum earlier
-		hashKey, _ := NewInt64PairHashKey(bytes)
+		hashKey, err := hashKeyFunc(bytes)
+		if err != nil {
+			panic(fmt.Sprintf("hashKeyFunc failure: %v", err))
+		}
 		return hashKey
 	}, nil
 }
 
-func NewHashSum(hasher hash.Hash) HashSum {
+func NewHash(hasher hash.Hash) HashSum {
 	return func(key []byte) []byte {
-		return hasher.Sum(key)
+		hasher.Reset()
+		hasher.Write(key)
+		return hasher.Sum(nil)
+	}
+}
+
+func (r HashSum) FirstBytes(n int) HashSum {
+	return func(bytes []byte) []byte {
+		return r(bytes)[:n]
+	}
+}
+
+func (r HashSum) LastBytes(n int) HashSum {
+	return func(bytes []byte) []byte {
+		result := r(bytes)
+		return result[len(result)-n:]
 	}
 }

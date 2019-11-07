@@ -8,7 +8,7 @@ import (
 )
 
 var defaultHashFunc = func() HashFunc {
-	hashFunc, err := NewHashSum(md5.New()).Int64PairHash()
+	hashFunc, err := NewHash(md5.New()).Use(NewInt64PairHashKey)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create defaultHashFunc: %s", err.Error()))
 	}

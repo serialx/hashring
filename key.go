@@ -18,9 +18,13 @@ func (k *Int64PairHashKey) Less(other HashKey) bool {
 	return k.High == o.High && k.Low < o.Low
 }
 
-func NewInt64PairHashKey(bytes []byte) (*Int64PairHashKey, error) {
-	if len(bytes) != 16 {
-		return nil, fmt.Errorf("expected 16 bytes, got %d bytes", len(bytes))
+func NewInt64PairHashKey(bytes []byte) (HashKey, error) {
+	const expected = 16
+	if len(bytes) != expected {
+		return nil, fmt.Errorf(
+			"expected %d bytes, got %d bytes",
+			expected, len(bytes),
+		)
 	}
 	return &Int64PairHashKey{
 		High: int64(binary.LittleEndian.Uint64(bytes[:8])),
