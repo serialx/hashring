@@ -1,17 +1,50 @@
 package hashring
 
 import (
-	"crypto/sha1"
-	"crypto/sha256"
-	"crypto/sha512"
-	"fmt"
-	"hash"
-	"hash/fnv"
+	"math"
 	"reflect"
+	"sort"
+	"strconv"
 	"testing"
-
-	"github.com/minio/highwayhash"
 )
+
+func testGenerateCircle(
+	nodes []string,
+	weights map[string]int,
+	ring map[HashKey]string,
+	sortedKeys []HashKey,
+	_ func(key string) HashKey,
+) ([]string, map[string]int, map[HashKey]string, []HashKey) {
+	totalWeight := 0
+	for _, node := range nodes {
+		if weight, ok := weights[node]; ok {
+			totalWeight += weight
+		} else {
+			totalWeight += 1
+			weights[node] = 1
+		}
+	}
+
+	for _, node := range nodes {
+		weight := weights[node]
+
+		factor := math.Floor(float64(40*len(nodes)*weight) / float64(totalWeight))
+
+		for j := 0; j < int(factor); j++ {
+			nodeKey := node + "-" + strconv.FormatInt(int64(j), 10)
+			bKey := defaultHashDigest(nodeKey)
+
+			for i := 0; i < 3; i++ {
+				key := defaultHashVal(bKey[i*4 : i*4+4])
+				ring[key] = node
+				sortedKeys = append(sortedKeys, key)
+			}
+		}
+	}
+
+	sort.Sort(HashKeyOrder(sortedKeys))
+	return nodes, weights, ring, sortedKeys
+}
 
 func expectNode(t *testing.T, hashRing *HashRing, key string, expectedNode string) {
 	node, ok := hashRing.GetNode(key)
@@ -67,7 +100,7 @@ func expectNodesABCD(t *testing.T, hashRing *HashRing) {
 
 func TestNew(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 
 	expectNodesABC(t, hashRing)
 	expectNodeRangesABC(t, hashRing)
@@ -75,7 +108,7 @@ func TestNew(t *testing.T) {
 
 func TestNewEmpty(t *testing.T) {
 	nodes := []string{}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 
 	node, ok := hashRing.GetNode("test")
 	if ok || node != "" {
@@ -90,7 +123,7 @@ func TestNewEmpty(t *testing.T) {
 
 func TestForMoreNodes(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 
 	nodes, ok := hashRing.GetNodes("test", 5)
 	if ok || !(len(nodes) == 0) {
@@ -100,7 +133,7 @@ func TestForMoreNodes(t *testing.T) {
 
 func TestForEqualNodes(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 
 	nodes, ok := hashRing.GetNodes("test", 3)
 	if !ok && (len(nodes) == 3) {
@@ -110,7 +143,7 @@ func TestForEqualNodes(t *testing.T) {
 
 func TestNewSingle(t *testing.T) {
 	nodes := []string{"a"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 
 	expectNode(t, hashRing, "test", "a")
 	expectNode(t, hashRing, "test", "a")
@@ -134,7 +167,7 @@ func TestNewWeighted(t *testing.T) {
 	weights["a"] = 1
 	weights["b"] = 2
 	weights["c"] = 1
-	hashRing := NewWithWeights(weights)
+	hashRing := newWithWeightsCustomTest(weights, defaultHashKey, testGenerateCircle)
 
 	expectNode(t, hashRing, "test", "b")
 	expectNode(t, hashRing, "test", "b")
@@ -151,7 +184,7 @@ func TestNewWeighted(t *testing.T) {
 
 func TestRemoveNode(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 	hashRing = hashRing.RemoveNode("b")
 
 	expectNode(t, hashRing, "test", "a")
@@ -169,7 +202,7 @@ func TestRemoveNode(t *testing.T) {
 
 func TestAddNode(t *testing.T) {
 	nodes := []string{"a", "c"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 	hashRing = hashRing.AddNode("b")
 
 	expectNodesABC(t, hashRing)
@@ -184,7 +217,7 @@ func TestAddNode(t *testing.T) {
 
 func TestAddNode2(t *testing.T) {
 	nodes := []string{"a", "c"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 	hashRing = hashRing.AddNode("b")
 	hashRing = hashRing.AddNode("b")
 
@@ -194,7 +227,7 @@ func TestAddNode2(t *testing.T) {
 
 func TestAddNode3(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 	hashRing = hashRing.AddNode("d")
 
 	// Somehow adding d does not load balance these keys...
@@ -231,7 +264,7 @@ func TestAddNode3(t *testing.T) {
 
 func TestDuplicateNodes(t *testing.T) {
 	nodes := []string{"a", "a", "a", "a", "b"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 
 	expectNode(t, hashRing, "test", "a")
 	expectNode(t, hashRing, "test", "a")
@@ -246,7 +279,7 @@ func TestDuplicateNodes(t *testing.T) {
 
 func TestAddWeightedNode(t *testing.T) {
 	nodes := []string{"a", "c"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 	hashRing = hashRing.AddWeightedNode("b", 0)
 	hashRing = hashRing.AddWeightedNode("b", 2)
 	hashRing = hashRing.AddWeightedNode("b", 2)
@@ -266,7 +299,7 @@ func TestAddWeightedNode(t *testing.T) {
 
 func TestUpdateWeightedNode(t *testing.T) {
 	nodes := []string{"a", "c"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 	hashRing = hashRing.AddWeightedNode("b", 1)
 	hashRing = hashRing.UpdateWeightedNode("b", 2)
 	hashRing = hashRing.UpdateWeightedNode("b", 2)
@@ -288,7 +321,7 @@ func TestUpdateWeightedNode(t *testing.T) {
 
 func TestRemoveAddNode(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 
 	expectNodesABC(t, hashRing)
 	expectNodeRangesABC(t, hashRing)
@@ -326,7 +359,7 @@ func TestRemoveAddWeightedNode(t *testing.T) {
 	weights["a"] = 1
 	weights["b"] = 2
 	weights["c"] = 1
-	hashRing := NewWithWeights(weights)
+	hashRing := newWithWeightsCustomTest(weights, defaultHashKey, testGenerateCircle)
 
 	expectWeights(t, hashRing, weights)
 
@@ -378,7 +411,7 @@ func TestRemoveAddWeightedNode(t *testing.T) {
 
 func TestAddRemoveNode(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
-	hashRing := New(nodes)
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 	hashRing = hashRing.AddNode("d")
 
 	// Somehow adding d does not load balance these keys...
@@ -480,90 +513,51 @@ func TestAddRemoveNode(t *testing.T) {
 	expectNodeRangesABC(t, hashRing)
 }
 
-func TestCustomHashFailWithNil(t *testing.T) {
-	_, err := NewWithHash([]string{}, nil)
-	if err == nil {
-		t.Fatalf("NewWithHash should return an error if called with nil Hash")
-	}
-	_, err = NewWithHashAndWeights(map[string]int{}, nil)
-	if err == nil {
-		t.Fatalf("NewWithHash should return an error if called with nil Hash")
-	}
-}
-
-func TestCustomHash(t *testing.T) {
-	hasher := sha512.New()
-	nodes := []string{"a", "c"}
-	hashRing, _ := NewWithHash(nodes, hasher)
-
-	hashRing = hashRing.AddNode("b")
-	_, ok := hashRing.GetNode("omelette-du-fromage")
-	if !ok {
-		t.Fatalf("can't properly find a node")
-	}
-}
-
-func benchmarkHash(b *testing.B, size int, keyLen int, hash hash.Hash) {
-	nodes := []string{"a", "b", "c", "d", "e", "f", "g"}
-	hashRing, _ := NewWithHash(nodes, hash)
-	key := make([]byte, keyLen)
-	for i := range key {
-		key[i] = '0'
-	}
-
-	b.ResetTimer()
-	if size > 1 {
-		for i := 0; i < b.N; i++ {
-			// generate a printable ascii char (easier to display in debuggers)
-			key[i%len(key)] = byte(32 + i%(94))
-			hashRing.GetNodes(string(key), size)
-		}
-	} else {
-		for i := 0; i < b.N; i++ {
-			key[i%len(key)] = byte(32 + i%(94))
-			hashRing.GetNodes(string(key), size)
-		}
-	}
-}
-
 func BenchmarkHashes(b *testing.B) {
-	type Case struct {
-		name string
-		hash.Hash
+	nodes := []string{"a", "b", "c", "d", "e", "f", "g"}
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
+	tt := []struct {
+		key   string
+		nodes []string
+	}{
+		{"test", []string{"a", "b"}},
+		{"test", []string{"a", "b"}},
+		{"test1", []string{"b", "d"}},
+		{"test2", []string{"f", "b"}},
+		{"test3", []string{"f", "c"}},
+		{"test4", []string{"c", "b"}},
+		{"test5", []string{"f", "a"}},
+		{"aaaa", []string{"b", "a"}},
+		{"bbbb", []string{"f", "a"}},
 	}
-	nodeSearched := []int{1, 2, 5}
-	keyLens := []int{10, 50, 100, 500, 1024}
-	cases := []Case{
-		{
-			"sha256", sha256.New(),
-		},
-		{
-			"sha1", sha1.New(),
-		},
-		{
-			"sha512", sha512.New(),
-		},
-		{
-			"FNV1", fnv.New128(),
-		},
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		o := tt[i%len(tt)]
+		hashRing.GetNodes(o.key, 2)
 	}
+}
 
-	hw, _ := highwayhash.New([]byte("01234567890123456789012345678901"))
-	cases = append(cases, Case{"HighwayHash", hw})
-
-	for _, l := range keyLens {
-		b.Run(fmt.Sprintf("KeyLen%dB", l), func(b *testing.B) {
-
-			for _, n := range nodeSearched {
-				b.Run(fmt.Sprintf("N%d", n), func(b *testing.B) {
-					for _, test := range cases {
-						b.Run(test.name, func(b *testing.B) {
-							benchmarkHash(b, n, l, test.Hash)
-						})
-					}
-				})
-			}
-		})
+func BenchmarkHashesSingle(b *testing.B) {
+	nodes := []string{"a", "b", "c", "d", "e", "f", "g"}
+	hashRing := newCustomTest(nodes, defaultHashKey, testGenerateCircle)
+	tt := []struct {
+		key   string
+		nodes []string
+	}{
+		{"test", []string{"a", "b"}},
+		{"test", []string{"a", "b"}},
+		{"test1", []string{"b", "d"}},
+		{"test2", []string{"f", "b"}},
+		{"test3", []string{"f", "c"}},
+		{"test4", []string{"c", "b"}},
+		{"test5", []string{"f", "a"}},
+		{"aaaa", []string{"b", "a"}},
+		{"bbbb", []string{"f", "a"}},
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		o := tt[i%len(tt)]
+		hashRing.GetNode(o.key)
 	}
 }
 
@@ -571,6 +565,6 @@ func BenchmarkNew(b *testing.B) {
 	nodes := []string{"a", "b", "c", "d", "e", "f", "g"}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = New(nodes)
+		_ = newCustomTest(nodes, defaultHashKey, testGenerateCircle)
 	}
 }
