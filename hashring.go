@@ -1,15 +1,12 @@
 package hashring
 
 import (
-	"crypto/md5"
 	"sort"
 	"strconv"
 )
 
-type PairHashKey struct {
-	First  int64
-	Second int64
-}
+var defaultHashFunc = MD5().Int64PairHash()
+
 type HashKey interface {
 	Less(other HashKey) bool
 }
@@ -21,21 +18,14 @@ func (h HashKeyOrder) Less(i, j int) bool {
 	return h[i].Less(h[j])
 }
 
-func (k PairHashKey) Less(other HashKey) bool {
-	o := other.(PairHashKey)
-	if k.First < o.First {
-		return true
-	}
-	return k.First == o.First && k.Second < o.Second
-}
+type HashFunc func([]byte) HashKey
 
 type HashRing struct {
-	ring               map[HashKey]string
-	sortedKeys         []HashKey
-	nodes              []string
-	weights            map[string]int
-	hashKey            func(string) HashKey
-	generateCircleFunc generateCircleType
+	ring       map[HashKey]string
+	sortedKeys []HashKey
+	nodes      []string
+	weights    map[string]int
+	hashFunc   HashFunc
 }
 
 type Uint32HashKey uint32
@@ -44,83 +34,43 @@ func (k Uint32HashKey) Less(other HashKey) bool {
 	return k < other.(Uint32HashKey)
 }
 
-func defaultHashVal(bKey []byte) HashKey {
-	return ((Uint32HashKey(bKey[3]) << 24) |
-		(Uint32HashKey(bKey[2]) << 16) |
-		(Uint32HashKey(bKey[1]) << 8) |
-		(Uint32HashKey(bKey[0])))
-}
-
-func defaultHashDigest(key string) [md5.Size]byte {
-	return md5.Sum([]byte(key))
-}
-
-func defaultHashKey(key string) HashKey {
-	d := defaultHashDigest(key)
-	return defaultHashVal(d[:])
-}
-
 func New(nodes []string) *HashRing {
-	return newCustomTest(nodes, defaultHashKey, defaultGenerateCircle)
+	return NewCustom(nodes, MD5().Int64PairHash())
 }
 
-func NewCustom(nodes []string, hashKey func(string) HashKey) *HashRing {
-	return newCustomTest(nodes, hashKey, defaultGenerateCircle)
-}
-
-type generateCircleType func(
+func NewCustom(
 	nodes []string,
-	weights map[string]int,
-	ring map[HashKey]string,
-	sortedKeys []HashKey,
-	hashKey func(key string) HashKey,
-) ([]string, map[string]int, map[HashKey]string, []HashKey)
-
-// newCustomTest is an additional layer of abstraction to keep upstream tests working
-func newCustomTest(
-	nodes []string,
-	hashKey func(string) HashKey,
-	generateCircle generateCircleType,
+	hashKey HashFunc,
 ) *HashRing {
 	hashRing := &HashRing{
-		ring:               make(map[HashKey]string),
-		sortedKeys:         make([]HashKey, 0),
-		nodes:              nodes,
-		weights:            make(map[string]int),
-		hashKey:            hashKey,
-		generateCircleFunc: generateCircle,
+		ring:       make(map[HashKey]string),
+		sortedKeys: make([]HashKey, 0),
+		nodes:      nodes,
+		weights:    make(map[string]int),
+		hashFunc:   hashKey,
 	}
 	hashRing.generateCircle()
 	return hashRing
 }
 
 func NewWithWeights(weights map[string]int) *HashRing {
-	return newWithWeightsCustomTest(weights, defaultHashKey, nil)
+	return NewWithWeightsCustom(weights, defaultHashFunc)
 }
 
 func NewWithWeightsCustom(
 	weights map[string]int,
-	hashKey func(key string) HashKey,
-) *HashRing {
-	return newWithWeightsCustomTest(weights, hashKey, defaultGenerateCircle)
-}
-
-func newWithWeightsCustomTest(
-	weights map[string]int,
-	hashKey func(key string) HashKey,
-	generateCircle generateCircleType,
+	hashFunc HashFunc,
 ) *HashRing {
 	nodes := make([]string, 0, len(weights))
 	for node := range weights {
 		nodes = append(nodes, node)
 	}
 	hashRing := &HashRing{
-		ring:               make(map[HashKey]string),
-		sortedKeys:         make([]HashKey, 0),
-		nodes:              nodes,
-		weights:            weights,
-		hashKey:            hashKey,
-		generateCircleFunc: generateCircle,
+		ring:       make(map[HashKey]string),
+		sortedKeys: make([]HashKey, 0),
+		nodes:      nodes,
+		weights:    weights,
+		hashFunc:   hashFunc,
 	}
 	hashRing.generateCircle()
 	return hashRing
@@ -145,7 +95,7 @@ func (h *HashRing) UpdateWithWeights(weights map[string]int) {
 	}
 
 	if nodesChgFlg {
-		newhring := NewWithWeightsCustom(weights, h.hashKey)
+		newhring := NewWithWeightsCustom(weights, h.hashFunc)
 		h.weights = newhring.weights
 		h.nodes = newhring.nodes
 		h.ring = newhring.ring
@@ -153,40 +103,29 @@ func (h *HashRing) UpdateWithWeights(weights map[string]int) {
 	}
 }
 
-func defaultGenerateCircle(
-	nodes []string,
-	weights map[string]int,
-	ring map[HashKey]string,
-	sortedKeys []HashKey,
-	hashKey func(key string) HashKey,
-) ([]string, map[string]int, map[HashKey]string, []HashKey) {
+func (h *HashRing) generateCircle() {
 	totalWeight := 0
-	for _, node := range nodes {
-		if weight, ok := weights[node]; ok {
+	for _, node := range h.nodes {
+		if weight, ok := h.weights[node]; ok {
 			totalWeight += weight
 		} else {
 			totalWeight += 1
-			weights[node] = 1
+			h.weights[node] = 1
 		}
 	}
 
-	for _, node := range nodes {
-		weight := weights[node]
+	for _, node := range h.nodes {
+		weight := h.weights[node]
 
 		for j := 0; j < weight; j++ {
 			nodeKey := node + "-" + strconv.FormatInt(int64(j), 10)
-			key := hashKey(nodeKey)
-			ring[key] = node
-			sortedKeys = append(sortedKeys, key)
+			key := h.hashFunc([]byte(nodeKey))
+			h.ring[key] = node
+			h.sortedKeys = append(h.sortedKeys, key)
 		}
 	}
 
-	sort.Sort(HashKeyOrder(sortedKeys))
-	return nodes, weights, ring, sortedKeys
-}
-
-func (h *HashRing) generateCircle() {
-	h.nodes, h.weights, h.ring, h.sortedKeys = h.generateCircleFunc(h.nodes, h.weights, h.ring, h.sortedKeys, h.hashKey)
+	sort.Sort(HashKeyOrder(h.sortedKeys))
 }
 
 func (h *HashRing) SortedKeys() []HashKey {
@@ -220,7 +159,7 @@ func (h *HashRing) GetNodePos(stringKey string) (pos int, ok bool) {
 }
 
 func (h *HashRing) GenKey(key string) HashKey {
-	return h.hashKey(key)
+	return h.hashFunc([]byte(key))
 }
 
 func (h *HashRing) GetNodes(stringKey string, size int) (nodes []string, ok bool) {
@@ -276,12 +215,11 @@ func (h *HashRing) AddWeightedNode(node string, weight int) *HashRing {
 	weights[node] = weight
 
 	hashRing := &HashRing{
-		ring:               make(map[HashKey]string),
-		sortedKeys:         make([]HashKey, 0),
-		nodes:              nodes,
-		weights:            weights,
-		hashKey:            h.hashKey,
-		generateCircleFunc: h.generateCircleFunc,
+		ring:       make(map[HashKey]string),
+		sortedKeys: make([]HashKey, 0),
+		nodes:      nodes,
+		weights:    weights,
+		hashFunc:   h.hashFunc,
 	}
 	hashRing.generateCircle()
 	return hashRing
@@ -307,12 +245,11 @@ func (h *HashRing) UpdateWeightedNode(node string, weight int) *HashRing {
 	weights[node] = weight
 
 	hashRing := &HashRing{
-		ring:               make(map[HashKey]string),
-		sortedKeys:         make([]HashKey, 0),
-		nodes:              nodes,
-		weights:            weights,
-		hashKey:            h.hashKey,
-		generateCircleFunc: h.generateCircleFunc,
+		ring:       make(map[HashKey]string),
+		sortedKeys: make([]HashKey, 0),
+		nodes:      nodes,
+		weights:    weights,
+		hashFunc:   h.hashFunc,
 	}
 	hashRing.generateCircle()
 	return hashRing
@@ -338,12 +275,11 @@ func (h *HashRing) RemoveNode(node string) *HashRing {
 	}
 
 	hashRing := &HashRing{
-		ring:               make(map[HashKey]string),
-		sortedKeys:         make([]HashKey, 0),
-		nodes:              nodes,
-		weights:            weights,
-		hashKey:            h.hashKey,
-		generateCircleFunc: h.generateCircleFunc,
+		ring:       make(map[HashKey]string),
+		sortedKeys: make([]HashKey, 0),
+		nodes:      nodes,
+		weights:    weights,
+		hashFunc:   h.hashFunc,
 	}
 	hashRing.generateCircle()
 	return hashRing
