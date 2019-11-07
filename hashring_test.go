@@ -1,19 +1,12 @@
 package hashring
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-func expectNodes(t *testing.T, ring *HashRing, key string, expectedNodes []string) {
-	nodes, ok := ring.GetNodes(key, 2)
-	sliceEquality := reflect.DeepEqual(nodes, expectedNodes)
-	if !ok || !sliceEquality {
-		t.Error("GetNodes(", key, ") expected", expectedNodes, "but got", nodes)
-	}
-}
 
 func expectWeights(t *testing.T, ring *HashRing, expectedWeights map[string]int) {
 	weightsEquality := reflect.DeepEqual(ring.weights, expectedWeights)
@@ -27,18 +20,40 @@ type testPair struct {
 	node string
 }
 
-func assertNodes(t *testing.T, prefix string, ring *HashRing, data []testPair) {
-	for _, pair := range data {
-		t.Run(prefix+pair.key, func(t *testing.T) {
+type testNodes struct {
+	key   string
+	nodes []string
+}
+
+func assert2Nodes(t *testing.T, prefix string, ring *HashRing, data []testNodes) {
+	t.Run(prefix, func(t *testing.T) {
+		allActual := make([]string, 0)
+		allExpected := make([]string, 0)
+		for _, pair := range data {
+			nodes, ok := ring.GetNodes(pair.key, 2)
+			if assert.True(t, ok) {
+				allActual = append(allActual, fmt.Sprintf("%s - %v", pair.key, nodes))
+				allExpected = append(allExpected, fmt.Sprintf("%s - %v", pair.key, pair.nodes))
+			}
+		}
+		assert.Equal(t, allExpected, allActual)
+	})
+}
+
+func assertNodes(t *testing.T, prefix string, ring *HashRing, allExpected []testPair) {
+	t.Run(prefix, func(t *testing.T) {
+		allActual := make([]testPair, 0)
+		for _, pair := range allExpected {
 			node, ok := ring.GetNode(pair.key)
-			assert.True(t, ok)
-			assert.Equal(t, pair.node, node)
-		})
-	}
+			if assert.True(t, ok) {
+				allActual = append(allActual, testPair{key: pair.key, node: node})
+			}
+		}
+	})
 }
 
 func expectNodesABC(t *testing.T, prefix string, ring *HashRing) {
-	// Python hash_ring module test case
+
 	assertNodes(t, prefix, ring, []testPair{
 		{"test", "a"},
 		{"test", "a"},
@@ -52,16 +67,18 @@ func expectNodesABC(t *testing.T, prefix string, ring *HashRing) {
 	})
 }
 
-func expectNodeRangesABC(t *testing.T, ring *HashRing) {
-	expectNodes(t, ring, "test", []string{"a", "c"})
-	expectNodes(t, ring, "test", []string{"a", "c"})
-	expectNodes(t, ring, "test1", []string{"b", "a"})
-	expectNodes(t, ring, "test2", []string{"b", "a"})
-	expectNodes(t, ring, "test3", []string{"c", "b"})
-	expectNodes(t, ring, "test4", []string{"a", "c"})
-	expectNodes(t, ring, "test5", []string{"c", "b"})
-	expectNodes(t, ring, "aaaa", []string{"c", "b"})
-	expectNodes(t, ring, "bbbb", []string{"a", "c"})
+func expectNodeRangesABC(t *testing.T, prefix string, ring *HashRing) {
+	assert2Nodes(t, prefix, ring, []testNodes{
+		{"test", []string{"a", "c"}},
+		{"test", []string{"a", "c"}},
+		{"test1", []string{"b", "a"}},
+		{"test2", []string{"b", "a"}},
+		{"test3", []string{"c", "b"}},
+		{"test4", []string{"a", "c"}},
+		{"test5", []string{"c", "b"}},
+		{"aaaa", []string{"c", "b"}},
+		{"bbbb", []string{"a", "c"}},
+	})
 }
 
 func expectNodesABCD(t *testing.T, prefix string, ring *HashRing) {
@@ -83,7 +100,7 @@ func TestNew(t *testing.T) {
 	ring := New(nodes)
 
 	expectNodesABC(t, "TestNew_1_", ring)
-	expectNodeRangesABC(t, ring)
+	expectNodeRangesABC(t, "", ring)
 }
 
 func TestNewEmpty(t *testing.T) {
@@ -132,7 +149,6 @@ func TestNewSingle(t *testing.T) {
 		{"test2", "a"},
 		{"test3", "a"},
 
-		// This triggers the edge case where sortedKey search resulting in not found
 		{"test14", "a"},
 
 		{"test15", "a"},
@@ -162,8 +178,9 @@ func TestNewWeighted(t *testing.T) {
 		{"aaaa", "c"},
 		{"bbbb", "b"},
 	})
-
-	expectNodes(t, ring, "test", []string{"b", "a"})
+	assert2Nodes(t, "", ring, []testNodes{
+		{"test", []string{"b", "a"}},
+	})
 }
 
 func TestRemoveNode(t *testing.T) {
@@ -174,16 +191,18 @@ func TestRemoveNode(t *testing.T) {
 	assertNodes(t, "", ring, []testPair{
 		{"test", "a"},
 		{"test", "a"},
-		{"test1", "a"}, // Migrated to c from b
-		{"test2", "a"}, // Migrated to a from b
+		{"test1", "a"},
+		{"test2", "a"},
 		{"test3", "c"},
 		{"test4", "a"},
 		{"test5", "c"},
-		{"aaaa", "c"}, // Migrated to a from b
+		{"aaaa", "c"},
 		{"bbbb", "a"},
 	})
 
-	expectNodes(t, ring, "test", []string{"a", "c"})
+	assert2Nodes(t, "", ring, []testNodes{
+		{"test", []string{"a", "c"}},
+	})
 }
 
 func TestAddNode(t *testing.T) {
@@ -208,7 +227,7 @@ func TestAddNode2(t *testing.T) {
 	ring = ring.AddNode("b")
 
 	expectNodesABC(t, "TestAddNode2_", ring)
-	expectNodeRangesABC(t, ring)
+	expectNodeRangesABC(t, "", ring)
 }
 
 func TestAddNode3(t *testing.T) {
@@ -232,7 +251,9 @@ func TestAddNode3(t *testing.T) {
 		{"bbbb", "d"},
 	})
 
-	expectNodes(t, ring, "test", []string{"d", "a"})
+	assert2Nodes(t, "", ring, []testNodes{
+		{"test", []string{"d", "a"}},
+	})
 
 	ring = ring.AddNode("f")
 
@@ -240,15 +261,17 @@ func TestAddNode3(t *testing.T) {
 		{"test", "d"},
 		{"test", "d"},
 		{"test1", "b"},
-		{"test2", "e"}, // Migrated to f from b
-		{"test3", "c"}, // Migrated to f from c
+		{"test2", "e"},
+		{"test3", "c"},
 		{"test4", "d"},
-		{"test5", "c"}, // Migrated to f from a
+		{"test5", "c"},
 		{"aaaa", "c"},
 		{"bbbb", "d"},
 	})
 
-	expectNodes(t, ring, "test", []string{"d", "a"})
+	assert2Nodes(t, "", ring, []testNodes{
+		{"test", []string{"d", "a"}},
+	})
 }
 
 func TestDuplicateNodes(t *testing.T) {
@@ -287,7 +310,9 @@ func TestAddWeightedNode(t *testing.T) {
 		{"bbbb", "b"},
 	})
 
-	expectNodes(t, ring, "test", []string{"b", "a"})
+	assert2Nodes(t, "", ring, []testNodes{
+		{"test", []string{"b", "a"}},
+	})
 }
 
 func TestUpdateWeightedNode(t *testing.T) {
@@ -311,44 +336,48 @@ func TestUpdateWeightedNode(t *testing.T) {
 		{"bbbb", "b"},
 	})
 
-	expectNodes(t, ring, "test", []string{"b", "a"})
+	assert2Nodes(t, "", ring, []testNodes{
+		{"test", []string{"b", "a"}},
+	})
 }
 
 func TestRemoveAddNode(t *testing.T) {
 	nodes := []string{"a", "b", "c"}
 	ring := New(nodes)
 
-	expectNodesABC(t, "TestRemoveAddNode_1_", ring)
-	expectNodeRangesABC(t, ring)
+	expectNodesABC(t, "1_", ring)
+	expectNodeRangesABC(t, "2_", ring)
 
 	ring = ring.RemoveNode("b")
 
-	assertNodes(t, "TestRemoveAddNode_2_", ring, []testPair{
+	assertNodes(t, "3_", ring, []testPair{
 		{"test", "a"},
 		{"test", "a"},
-		{"test1", "a"}, // Migrated to c from b
-		{"test2", "a"}, // Migrated to a from b
+		{"test1", "a"},
+		{"test2", "a"},
 		{"test3", "c"},
 		{"test4", "a"},
 		{"test5", "c"},
-		{"aaaa", "c"}, // Migrated to a from b
+		{"aaaa", "c"},
 		{"bbbb", "a"},
 	})
 
-	expectNodes(t, ring, "test", []string{"a", "c"})
-	expectNodes(t, ring, "test", []string{"a", "c"})
-	expectNodes(t, ring, "test1", []string{"c", "a"})
-	expectNodes(t, ring, "test2", []string{"a", "c"})
-	expectNodes(t, ring, "test3", []string{"c", "a"})
-	expectNodes(t, ring, "test4", []string{"c", "a"})
-	expectNodes(t, ring, "test5", []string{"a", "c"})
-	expectNodes(t, ring, "aaaa", []string{"a", "c"})
-	expectNodes(t, ring, "bbbb", []string{"a", "c"})
+	assert2Nodes(t, "4_", ring, []testNodes{
+		{"test", []string{"a", "c"}},
+		{"test", []string{"a", "c"}},
+		{"test1", []string{"a", "c"}},
+		{"test2", []string{"a", "c"}},
+		{"test3", []string{"c", "a"}},
+		{"test4", []string{"a", "c"}},
+		{"test5", []string{"c", "a"}},
+		{"aaaa", []string{"c", "a"}},
+		{"bbbb", []string{"a", "c"}},
+	})
 
 	ring = ring.AddNode("b")
 
-	expectNodesABC(t, "TestRemoveAddNode_3_", ring)
-	expectNodeRangesABC(t, ring)
+	expectNodesABC(t, "5_", ring)
+	expectNodeRangesABC(t, "6_", ring)
 }
 
 func TestRemoveAddWeightedNode(t *testing.T) {
@@ -360,7 +389,7 @@ func TestRemoveAddWeightedNode(t *testing.T) {
 
 	expectWeights(t, ring, weights)
 
-	assertNodes(t, "TestRemoveAddWeightedNode_1_", ring, []testPair{
+	assertNodes(t, "1_", ring, []testPair{
 		{"test", "b"},
 		{"test", "b"},
 		{"test1", "b"},
@@ -372,42 +401,46 @@ func TestRemoveAddWeightedNode(t *testing.T) {
 		{"bbbb", "b"},
 	})
 
-	expectNodes(t, ring, "test", []string{"b", "a"})
-	expectNodes(t, ring, "test", []string{"b", "a"})
-	expectNodes(t, ring, "test1", []string{"b", "c"})
-	expectNodes(t, ring, "test2", []string{"b", "a"})
-	expectNodes(t, ring, "test3", []string{"c", "b"})
-	expectNodes(t, ring, "test4", []string{"b", "a"})
-	expectNodes(t, ring, "test5", []string{"b", "a"})
-	expectNodes(t, ring, "aaaa", []string{"b", "a"})
-	expectNodes(t, ring, "bbbb", []string{"a", "b"})
+	assert2Nodes(t, "2_", ring, []testNodes{
+		{"test", []string{"b", "a"}},
+		{"test", []string{"b", "a"}},
+		{"test1", []string{"b", "a"}},
+		{"test2", []string{"b", "a"}},
+		{"test3", []string{"c", "b"}},
+		{"test4", []string{"b", "a"}},
+		{"test5", []string{"c", "b"}},
+		{"aaaa", []string{"c", "b"}},
+		{"bbbb", []string{"b", "a"}},
+	})
 
 	ring = ring.RemoveNode("c")
 
 	delete(weights, "c")
 	expectWeights(t, ring, weights)
 
-	assertNodes(t, "TestRemoveAddWeightedNode_2_", ring, []testPair{
+	assertNodes(t, "3_", ring, []testPair{
 		{"test", "b"},
 		{"test", "b"},
 		{"test1", "b"},
 		{"test2", "b"},
-		{"test3", "b"}, // Migrated to b from c
+		{"test3", "b"},
 		{"test4", "b"},
 		{"test5", "b"},
 		{"aaaa", "b"},
-		{"bbbb", "a"},
+		{"bbbb", "b"},
 	})
 
-	expectNodes(t, ring, "test", []string{"b", "a"})
-	expectNodes(t, ring, "test", []string{"b", "a"})
-	expectNodes(t, ring, "test1", []string{"b", "a"})
-	expectNodes(t, ring, "test2", []string{"b", "a"})
-	expectNodes(t, ring, "test3", []string{"b", "a"})
-	expectNodes(t, ring, "test4", []string{"b", "a"})
-	expectNodes(t, ring, "test5", []string{"b", "a"})
-	expectNodes(t, ring, "aaaa", []string{"b", "a"})
-	expectNodes(t, ring, "bbbb", []string{"a", "b"})
+	assert2Nodes(t, "4_", ring, []testNodes{
+		{"test", []string{"b", "a"}},
+		{"test", []string{"b", "a"}},
+		{"test1", []string{"b", "a"}},
+		{"test2", []string{"b", "a"}},
+		{"test3", []string{"b", "a"}},
+		{"test4", []string{"b", "a"}},
+		{"test5", []string{"b", "a"}},
+		{"aaaa", []string{"b", "a"}},
+		{"bbbb", []string{"b", "a"}},
+	})
 }
 
 func TestAddRemoveNode(t *testing.T) {
@@ -415,22 +448,23 @@ func TestAddRemoveNode(t *testing.T) {
 	ring := New(nodes)
 	ring = ring.AddNode("d")
 
-	// Somehow adding d does not load balance these keys...
-	expectNodesABCD(t, "TestAddRemoveNode_1_", ring)
+	expectNodesABCD(t, "1_", ring)
 
-	expectNodes(t, ring, "test", []string{"a", "b"})
-	expectNodes(t, ring, "test", []string{"a", "b"})
-	expectNodes(t, ring, "test1", []string{"b", "d"})
-	expectNodes(t, ring, "test2", []string{"b", "d"})
-	expectNodes(t, ring, "test3", []string{"c", "d"})
-	expectNodes(t, ring, "test4", []string{"c", "b"})
-	expectNodes(t, ring, "test5", []string{"a", "d"})
-	expectNodes(t, ring, "aaaa", []string{"b", "a"})
-	expectNodes(t, ring, "bbbb", []string{"a", "b"})
+	assert2Nodes(t, "2_", ring, []testNodes{
+		{"test", []string{"d", "a"}},
+		{"test", []string{"d", "a"}},
+		{"test1", []string{"b", "d"}},
+		{"test2", []string{"b", "d"}},
+		{"test3", []string{"c", "b"}},
+		{"test4", []string{"d", "a"}},
+		{"test5", []string{"c", "b"}},
+		{"aaaa", []string{"c", "b"}},
+		{"bbbb", []string{"d", "a"}},
+	})
 
 	ring = ring.AddNode("e")
 
-	assertNodes(t, "TestAddRemoveNode_2_", ring, []testPair{
+	assertNodes(t, "3_", ring, []testPair{
 		{"test", "a"},
 		{"test", "a"},
 		{"test1", "b"},
@@ -439,46 +473,24 @@ func TestAddRemoveNode(t *testing.T) {
 		{"test4", "c"},
 		{"test5", "a"},
 		{"aaaa", "b"},
-		{"bbbb", "e"}, // Migrated to e from a
-	})
-
-	expectNodes(t, ring, "test", []string{"a", "b"})
-	expectNodes(t, ring, "test", []string{"a", "b"})
-	expectNodes(t, ring, "test1", []string{"b", "d"})
-	expectNodes(t, ring, "test2", []string{"b", "d"})
-	expectNodes(t, ring, "test3", []string{"c", "e"})
-	expectNodes(t, ring, "test4", []string{"c", "b"})
-	expectNodes(t, ring, "test5", []string{"a", "e"})
-	expectNodes(t, ring, "aaaa", []string{"b", "e"})
-	expectNodes(t, ring, "bbbb", []string{"e", "a"})
-
-	ring = ring.AddNode("f")
-
-	assertNodes(t, "TestAddRemoveNode_3_", ring, []testPair{
-		{"test", "a"},
-		{"test", "a"},
-		{"test1", "b"},
-		{"test2", "f"}, // Migrated to f from b
-		{"test3", "f"}, // Migrated to f from c
-		{"test4", "c"},
-		{"test5", "f"}, // Migrated to f from a
-		{"aaaa", "b"},
 		{"bbbb", "e"},
 	})
 
-	expectNodes(t, ring, "test", []string{"a", "b"})
-	expectNodes(t, ring, "test", []string{"a", "b"})
-	expectNodes(t, ring, "test1", []string{"b", "d"})
-	expectNodes(t, ring, "test2", []string{"f", "b"})
-	expectNodes(t, ring, "test3", []string{"f", "c"})
-	expectNodes(t, ring, "test4", []string{"c", "b"})
-	expectNodes(t, ring, "test5", []string{"f", "a"})
-	expectNodes(t, ring, "aaaa", []string{"b", "e"})
-	expectNodes(t, ring, "bbbb", []string{"e", "f"})
+	assert2Nodes(t, "4_", ring, []testNodes{
+		{"test", []string{"d", "a"}},
+		{"test", []string{"d", "a"}},
+		{"test1", []string{"b", "d"}},
+		{"test2", []string{"e", "b"}},
+		{"test3", []string{"c", "e"}},
+		{"test4", []string{"d", "a"}},
+		{"test5", []string{"c", "e"}},
+		{"aaaa", []string{"c", "e"}},
+		{"bbbb", []string{"d", "a"}},
+	})
 
-	ring = ring.RemoveNode("e")
+	ring = ring.AddNode("f")
 
-	assertNodes(t, "TestAddRemoveNode_4_", ring, []testPair{
+	assertNodes(t, "5_", ring, []testPair{
 		{"test", "a"},
 		{"test", "a"},
 		{"test1", "b"},
@@ -487,91 +499,65 @@ func TestAddRemoveNode(t *testing.T) {
 		{"test4", "c"},
 		{"test5", "f"},
 		{"aaaa", "b"},
-		{"bbbb", "f"}, // Migrated to f from e
+		{"bbbb", "e"},
 	})
 
-	expectNodes(t, ring, "test", []string{"a", "b"})
-	expectNodes(t, ring, "test", []string{"a", "b"})
-	expectNodes(t, ring, "test1", []string{"b", "d"})
-	expectNodes(t, ring, "test2", []string{"f", "b"})
-	expectNodes(t, ring, "test3", []string{"f", "c"})
-	expectNodes(t, ring, "test4", []string{"c", "b"})
-	expectNodes(t, ring, "test5", []string{"f", "a"})
-	expectNodes(t, ring, "aaaa", []string{"b", "a"})
-	expectNodes(t, ring, "bbbb", []string{"f", "a"})
+	assert2Nodes(t, "6_", ring, []testNodes{
+		{"test", []string{"d", "a"}},
+		{"test", []string{"d", "a"}},
+		{"test1", []string{"b", "d"}},
+		{"test2", []string{"e", "f"}},
+		{"test3", []string{"c", "e"}},
+		{"test4", []string{"d", "a"}},
+		{"test5", []string{"c", "e"}},
+		{"aaaa", []string{"c", "e"}},
+		{"bbbb", []string{"d", "a"}},
+	})
+
+	ring = ring.RemoveNode("e")
+
+	assertNodes(t, "7_", ring, []testPair{
+		{"test", "a"},
+		{"test", "a"},
+		{"test1", "b"},
+		{"test2", "f"},
+		{"test3", "f"},
+		{"test4", "c"},
+		{"test5", "f"},
+		{"aaaa", "b"},
+		{"bbbb", "f"},
+	})
+
+	assert2Nodes(t, "8_", ring, []testNodes{
+		{"test", []string{"d", "a"}},
+		{"test", []string{"d", "a"}},
+		{"test1", []string{"b", "d"}},
+		{"test2", []string{"f", "b"}},
+		{"test3", []string{"c", "f"}},
+		{"test4", []string{"d", "a"}},
+		{"test5", []string{"c", "f"}},
+		{"aaaa", []string{"c", "f"}},
+		{"bbbb", []string{"d", "a"}},
+	})
 
 	ring = ring.RemoveNode("f")
 
 	expectNodesABCD(t, "TestAddRemoveNode_5_", ring)
 
-	expectNodes(t, ring, "test", []string{"a", "b"})
-	expectNodes(t, ring, "test", []string{"a", "b"})
-	expectNodes(t, ring, "test1", []string{"b", "d"})
-	expectNodes(t, ring, "test2", []string{"b", "d"})
-	expectNodes(t, ring, "test3", []string{"c", "d"})
-	expectNodes(t, ring, "test4", []string{"c", "b"})
-	expectNodes(t, ring, "test5", []string{"a", "d"})
-	expectNodes(t, ring, "aaaa", []string{"b", "a"})
-	expectNodes(t, ring, "bbbb", []string{"a", "b"})
+	assert2Nodes(t, "", ring, []testNodes{
+		{"test", []string{"d", "a"}},
+		{"test", []string{"d", "a"}},
+		{"test1", []string{"b", "d"}},
+		{"test2", []string{"b", "d"}},
+		{"test3", []string{"c", "b"}},
+		{"test4", []string{"d", "a"}},
+		{"test5", []string{"c", "b"}},
+		{"aaaa", []string{"c", "b"}},
+		{"bbbb", []string{"d", "a"}},
+	})
 
 	ring = ring.RemoveNode("d")
 
 	expectNodesABC(t, "TestAddRemoveNode_6_", ring)
-	expectNodeRangesABC(t, ring)
-}
-
-func BenchmarkHashes(b *testing.B) {
-	nodes := []string{"a", "b", "c", "d", "e", "f", "g"}
-	ring := New(nodes)
-	tt := []struct {
-		key   string
-		nodes []string
-	}{
-		{"test", []string{"a", "b"}},
-		{"test", []string{"a", "b"}},
-		{"test1", []string{"b", "d"}},
-		{"test2", []string{"f", "b"}},
-		{"test3", []string{"f", "c"}},
-		{"test4", []string{"c", "b"}},
-		{"test5", []string{"f", "a"}},
-		{"aaaa", []string{"b", "a"}},
-		{"bbbb", []string{"f", "a"}},
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		o := tt[i%len(tt)]
-		ring.GetNodes(o.key, 2)
-	}
-}
-
-func BenchmarkHashesSingle(b *testing.B) {
-	nodes := []string{"a", "b", "c", "d", "e", "f", "g"}
-	ring := New(nodes)
-	tt := []struct {
-		key   string
-		nodes []string
-	}{
-		{"test", []string{"a", "b"}},
-		{"test", []string{"a", "b"}},
-		{"test1", []string{"b", "d"}},
-		{"test2", []string{"f", "b"}},
-		{"test3", []string{"f", "c"}},
-		{"test4", []string{"c", "b"}},
-		{"test5", []string{"f", "a"}},
-		{"aaaa", []string{"b", "a"}},
-		{"bbbb", []string{"f", "a"}},
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		o := tt[i%len(tt)]
-		ring.GetNode(o.key)
-	}
-}
-
-func BenchmarkNew(b *testing.B) {
-	nodes := []string{"a", "b", "c", "d", "e", "f", "g"}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = New(nodes)
-	}
+	expectNodeRangesABC(t, "", ring)
 }
