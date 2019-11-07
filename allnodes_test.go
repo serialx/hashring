@@ -3,6 +3,7 @@ package hashring
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,7 +23,21 @@ func TestIterateAllNodes(t *testing.T) {
 	nodes, ok := ring.GetNodes("1", ring.Size())
 	assert.True(t, ok)
 	if !assert.Equal(t, ring.Size(), len(nodes)) {
+		// print debug info on failure
 		sort.Strings(nodes)
 		fmt.Printf("%v\n", nodes)
+		return
+	}
+
+	// assert that each node shows up exatly once
+	sort.Strings(nodes)
+	for i, node := range nodes {
+		actual, err := strconv.ParseInt(node, 10, 64)
+		if !assert.NoError(t, err) {
+			return
+		}
+		if !assert.Equal(t, int64(i), actual) {
+			return
+		}
 	}
 }
