@@ -1,11 +1,19 @@
 package hashring
 
 import (
+	"crypto/md5"
+	"fmt"
 	"sort"
 	"strconv"
 )
 
-var defaultHashFunc = MD5().Int64PairHash()
+var defaultHashFunc = func() HashFunc {
+	hashFunc, err := NewHashSum(md5.New()).Int64PairHash()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create defaultHashFunc: %s", err.Error()))
+	}
+	return hashFunc
+}()
 
 type HashKey interface {
 	Less(other HashKey) bool
@@ -35,10 +43,10 @@ func (k Uint32HashKey) Less(other HashKey) bool {
 }
 
 func New(nodes []string) *HashRing {
-	return NewCustom(nodes, MD5().Int64PairHash())
+	return NewWithHash(nodes, defaultHashFunc)
 }
 
-func NewCustom(
+func NewWithHash(
 	nodes []string,
 	hashKey HashFunc,
 ) *HashRing {
@@ -54,10 +62,10 @@ func NewCustom(
 }
 
 func NewWithWeights(weights map[string]int) *HashRing {
-	return NewWithWeightsCustom(weights, defaultHashFunc)
+	return NewWithHashAndWeights(weights, defaultHashFunc)
 }
 
-func NewWithWeightsCustom(
+func NewWithHashAndWeights(
 	weights map[string]int,
 	hashFunc HashFunc,
 ) *HashRing {
@@ -95,7 +103,7 @@ func (h *HashRing) UpdateWithWeights(weights map[string]int) {
 	}
 
 	if nodesChgFlg {
-		newhring := NewWithWeightsCustom(weights, h.hashFunc)
+		newhring := NewWithHashAndWeights(weights, h.hashFunc)
 		h.weights = newhring.weights
 		h.nodes = newhring.nodes
 		h.ring = newhring.ring
@@ -126,10 +134,6 @@ func (h *HashRing) generateCircle() {
 	}
 
 	sort.Sort(HashKeyOrder(h.sortedKeys))
-}
-
-func (h *HashRing) SortedKeys() []HashKey {
-	return h.sortedKeys
 }
 
 func (h *HashRing) GetNode(stringKey string) (node string, ok bool) {

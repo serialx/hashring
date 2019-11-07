@@ -1,21 +1,33 @@
 package hashring
 
-import "crypto/md5"
+import (
+	"fmt"
+	"hash"
+)
 
-// HashResult allows to use a builder pattern to create different HashFunc objects
-// Example: hashFunc := MD5().Int64PairHash()
-type HashResult func([]byte) []byte
+// HashSum allows to use a builder pattern to create different HashFunc objects.
+// See examples for details.
+type HashSum func([]byte) []byte
 
-func (r HashResult) Int64PairHash() HashFunc {
+func (r HashSum) Int64PairHash() (HashFunc, error) {
+	// check HashSum for errors
+	testResult := r([]byte("test"))
+	_, err := NewInt64PairHashKey(testResult)
+	if err != nil {
+		return nil, fmt.Errorf("can't use given hash.Hash with Int64PairHash: %w", err)
+	}
+
+	// build HashFunc
 	return func(key []byte) HashKey {
 		bytes := r(key)
-		return NewInt64PairHashKey(bytes)
-	}
+		// ignore error because we already checked HashSum earlier
+		hashKey, _ := NewInt64PairHashKey(bytes)
+		return hashKey
+	}, nil
 }
 
-func MD5() HashResult {
+func NewHashSum(hasher hash.Hash) HashSum {
 	return func(key []byte) []byte {
-		bytes := md5.Sum(key)
-		return bytes[:]
+		return hasher.Sum(key)
 	}
 }
