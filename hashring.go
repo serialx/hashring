@@ -288,16 +288,3 @@ func (h *HashRing) RemoveNode(node string) *HashRing {
 	hashRing.generateCircle()
 	return hashRing
 }
-
-func hashVal(bKey []byte) HashKey {
-	return ((HashKey(bKey[3]) << 24) |
-		(HashKey(bKey[2]) << 16) |
-		(HashKey(bKey[1]) << 8) |
-		(HashKey(bKey[0])))
-}
-
-func (h *HashRing) hashDigest(key string) []byte {
-	h.hasher.Reset()
-	h.hasher.Write([]byte(key))
-	return h.hasher.Sum(nil)
-}
