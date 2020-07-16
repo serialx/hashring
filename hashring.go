@@ -8,7 +8,7 @@ import (
 )
 
 var defaultHashFunc = func() HashFunc {
-	hashFunc, err := NewHash(md5.New()).Use(NewInt64PairHashKey)
+	hashFunc, err := NewHash(md5.New).Use(NewInt64PairHashKey)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create defaultHashFunc: %s", err.Error()))
 	}
@@ -166,6 +166,9 @@ func (h *HashRing) GenKey(key string) HashKey {
 	return h.hashFunc([]byte(key))
 }
 
+// GetNodes iterates over the hash ring and returns the nodes in the order
+// which is determined by the key. GetNodes is thread safe if the hash
+// which was used to configure the hash ring is thread safe.
 func (h *HashRing) GetNodes(stringKey string, size int) (nodes []string, ok bool) {
 	pos, ok := h.GetNodePos(stringKey)
 	if !ok {
