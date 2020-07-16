@@ -13,13 +13,13 @@ func ExampleGetAllNodes() {
 }
 
 func ExampleCustomHashError() {
-	_, err := NewHash(sha1.New()).Use(NewInt64PairHashKey)
+	_, err := NewHash(sha1.New).Use(NewInt64PairHashKey)
 	fmt.Printf("%s", err.Error())
 	// Output: can't use given hash.Hash with given hashKeyFunc: expected 16 bytes, got 20 bytes
 }
 
 func ExampleCustomHash() {
-	hashFunc, _ := NewHash(sha1.New()).FirstBytes(16).Use(NewInt64PairHashKey)
+	hashFunc, _ := NewHash(sha1.New).FirstBytes(16).Use(NewInt64PairHashKey)
 	hashRing := NewWithHash([]string{"node1", "node2", "node3"}, hashFunc)
 	nodes, _ := hashRing.GetNodes("key", hashRing.Size())
 	fmt.Printf("%v", nodes)
@@ -27,7 +27,7 @@ func ExampleCustomHash() {
 }
 
 func ExampleNewHashFunc() {
-	hashFunc, _ := NewHash(sha1.New()).FirstBytes(16).Use(NewInt64PairHashKey)
+	hashFunc, _ := NewHash(sha1.New).FirstBytes(16).Use(NewInt64PairHashKey)
 	fmt.Printf("%v\n", hashFunc([]byte("test")))
 	// Output: &{-6441359348440544599 -8653224871661646820}
 }
