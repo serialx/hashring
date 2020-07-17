@@ -144,6 +144,13 @@ func (h *HashRing) GetNode(stringKey string) (node string, ok bool) {
 	return h.ring[h.sortedKeys[pos]], true
 }
 
+func (h* HashRing) GetNodeWithPos(pos int) (node string, ok bool) {
+	if pos < 0 || pos >= len(h.sortedKeys) {
+		return "",false
+	}
+	return h.ring[h.sortedKeys[pos]], true
+}
+
 func (h *HashRing) GetNodePos(stringKey string) (pos int, ok bool) {
 	if len(h.ring) == 0 {
 		return 0, false
