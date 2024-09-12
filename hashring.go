@@ -3,7 +3,7 @@ package hashring
 import (
 	"crypto/md5"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 )
 
@@ -17,6 +17,7 @@ var defaultHashFunc = func() HashFunc {
 
 type HashKey interface {
 	Less(other HashKey) bool
+	Compare(other HashKey) int
 }
 type HashKeyOrder []HashKey
 
@@ -24,6 +25,9 @@ func (h HashKeyOrder) Len() int      { return len(h) }
 func (h HashKeyOrder) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
 func (h HashKeyOrder) Less(i, j int) bool {
 	return h[i].Less(h[j])
+}
+func (h HashKeyOrder) Compare(i, j HashKey) int {
+	return i.Compare(j)
 }
 
 type HashFunc func([]byte) HashKey
@@ -40,6 +44,19 @@ type Uint32HashKey uint32
 
 func (k Uint32HashKey) Less(other HashKey) bool {
 	return k < other.(Uint32HashKey)
+}
+
+func (k Uint32HashKey) Compare(other HashKey) int {
+	if k.Less(other) {
+		return -1
+	}
+
+	o := other.(Uint32HashKey)
+	if k == o {
+		return 0
+	}
+
+	return 1
 }
 
 func New(nodes []string) *HashRing {
@@ -133,7 +150,7 @@ func (h *HashRing) generateCircle() {
 		}
 	}
 
-	sort.Sort(HashKeyOrder(h.sortedKeys))
+	slices.SortFunc(HashKeyOrder(h.sortedKeys), HashKeyOrder(h.sortedKeys).Compare)
 }
 
 func (h *HashRing) GetNode(stringKey string) (node string, ok bool) {
@@ -152,7 +169,7 @@ func (h *HashRing) GetNodePos(stringKey string) (pos int, ok bool) {
 	key := h.GenKey(stringKey)
 
 	nodes := h.sortedKeys
-	pos = sort.Search(len(nodes), func(i int) bool { return key.Less(nodes[i]) })
+	pos, _ = slices.BinarySearchFunc(HashKeyOrder(h.sortedKeys), key, HashKeyOrder(h.sortedKeys).Compare)
 
 	if pos == len(nodes) {
 		// Wrap the search, should return First node

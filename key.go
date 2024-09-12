@@ -18,6 +18,19 @@ func (k *Int64PairHashKey) Less(other HashKey) bool {
 	return k.High == o.High && k.Low < o.Low
 }
 
+func (k *Int64PairHashKey) Compare(other HashKey) int {
+	o := other.(*Int64PairHashKey)
+	if k.Less(o) {
+		return -1
+	}
+
+	if k.High == o.High && k.Low == o.Low {
+		return 0
+	}
+
+	return 1
+}
+
 func NewInt64PairHashKey(bytes []byte) (HashKey, error) {
 	const expected = 16
 	if len(bytes) != expected {
